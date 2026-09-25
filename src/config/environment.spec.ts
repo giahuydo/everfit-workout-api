@@ -5,7 +5,7 @@ describe('validateEnvironment', () => {
   it('applies safe runtime defaults', () => {
     const config = validateEnvironment({});
     expect(config.PORT).toBe(3000);
-    expect(config.DB_SYNCHRONIZE).toBe(true);
+    expect(config.DB_SYNCHRONIZE).toBe(false);
     expect(config.DB_STATEMENT_TIMEOUT_MS).toBe(15_000);
   });
 

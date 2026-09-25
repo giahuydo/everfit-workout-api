@@ -23,6 +23,10 @@ interface CursorPayload {
   scope: string;
 }
 
+interface HistoryRow extends WorkoutEntry {
+  cursorCreatedAt: string;
+}
+
 @Injectable()
 export class WorkoutsService {
   constructor(

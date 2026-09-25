@@ -1,44 +1,27 @@
-# AI Workflow and Evidence Status
+# AI Workflow
 
-This document is deliberately evidence-bounded. It uses repository Git history, current source, the public design documents, and `notes/ai-findings.md`. The latter is an internal template with no populated findings. It must not be treated as proof that an AI interaction, correction, or rejection occurred.
+AI was used as a design and review assistant. The engineer supplied the fixed API/date/numeric contracts, required bounded suggestions, and verified the resulting implementation with source review plus build, lint, tests, migrations, and query-plan tooling where the environment allowed. AI output was never accepted as authority over the assignment.
 
-## What is traceable
+## Evidenced corrections
 
-The Git history records a documentation/design commit followed by bootstrap, schema/unit, workout-history, and PR/range-comparison commits on 2026-09-25. The source and documents make the resulting implementation/design decisions reviewable. They do **not** identify an AI tool, prompt, model, generated output, human correction, test diagnosis, or rejected suggestion.
+The following cases are supported by the retained AI findings evidence; they are concise paraphrases of visible assistant suggestions, not reconstructed hidden reasoning.
 
-| Assignment area | Traceable tool/purpose evidence | Status |
+| Case | AI output or suggestion | Human correction and outcome |
 | --- | --- | --- |
-| Architecture | Git commit `8a542b3` added architecture, API, schema, ADR, and planning documents. | Documents are traceable; AI assistance is not. |
-| Coding | Commits `71aec40`, `bf6b979`, `9abb739`, and `f40e4c3` show scoped implementation changes. | Code is traceable; AI assistance is not. |
-| Testing | `package.json` defines Vitest commands; `notes/experiments.md` contains only empty/planned experiment templates. | No completed test or AI-testing evidence recorded. |
-| Debugging | Current code and history show no issue/failure → diagnosis → verified fix record. | No AI-debugging evidence recorded. |
-| Documentation | The root README and this file are documented from current source/design records. | Current documentation work is reviewable in Git; prior AI assistance is not. |
+| Workout time | Add optional `performedAt`, synthesize midnight UTC when missing, and derive the workout day. | Rejected. The contract is a client calendar `YYYY-MM-DD` stored as `DATE`; creating midnight UTC would fabricate workout time. `created_at` remains ingestion UTC. |
+| Numeric transport | Require decimal-string weights in the public JSON API. | Rejected. The public contract requires JSON-number `weight`; decimal-safe conversion is internal and the database uses `NUMERIC`. |
+| PR lookup/no-data | Make PR lookup exercise-ID based and return `404` for an unknown exercise. | Rejected. The endpoint is exact normalized exercise-name lookup; a valid no-data request returns `200` with null records and a message. |
+| Cursor ordering | Page same-day history by `(workout_date, id)` only. | Corrected as suboptimal. The implementation uses `(workout_date, created_at, id)` and preserves six-digit microseconds in the cursor so ingestion ordering is deterministic without treating it as workout time. |
 
-## Prompting and review strategy
+The first three are rejected suggestions; the last is a reviewed design correction. The first two also satisfy the required examples of suboptimal/wrong output followed by a human correction.
 
-The traceable project process is phase-oriented: design documents first, then bootstrap, schema/units, workout/history, and PR comparison commits. For future AI-assisted work, a defensible prompt should name the target files, exact API/data invariants, and acceptance checks; reviewers should then compare output against source contracts, run relevant tests, and record the prompt, output, correction, and verification in `notes/ai-findings.md`.
+## Working practices
 
-This is a recommended process, not a claim about unpublished prompts or system instructions. No prompt transcript is available, so no model, hidden instruction, or chronology is reconstructed here.
+- Put non-negotiable contracts first: calendar dates versus timestamps, public JSON numbers versus internal decimal arithmetic, exact PR lookup versus history substring filtering, and valid no-data behavior.
+- Ask for narrowly scoped changes with named files and acceptance checks; prefer migrations over synchronized schemas and avoid new infrastructure without measured evidence.
+- Independently review generated code against the API contract, especially cursor precision, response shapes, decimal conversion, and SQL ordering.
+- Keep evidence claims separate from plans: do not claim test results, benchmarks, or AI provenance that was not actually recorded.
 
-## Required AI case studies: pending evidence
+## Verification boundary
 
-The assignment asks for at least two genuine wrong/suboptimal AI outputs with human corrections and one genuine rejected AI suggestion. The repository has **zero populated findings** in `notes/ai-findings.md` and no equivalent traceable record in Git or the documents. Consequently, none of those three stories can truthfully be supplied.
-
-| Required evidence | Current result | What would close it |
-| --- | --- | --- |
-| Wrong/suboptimal AI output #1 + correction | Pending — no genuine output is recorded. | Preserve the output, identify the concrete defect, make the human correction, and link a test/review/commit. |
-| Wrong/suboptimal AI output #2 + correction | Pending — no genuine output is recorded. | Same evidence chain, distinct from case #1. |
-| Rejected AI suggestion + reason | Pending — no genuine rejected suggestion is recorded. | Preserve the suggestion and the evidence-based reason it was rejected. |
-
-No “weak AI stories” were invented to fill these gaps. In particular, the planned cautions in the ADRs (such as avoiding floating-point PR comparisons or avoiding unmeasured `pg_trgm`) are design decisions, not proof that an AI proposed the opposite.
-
-## Evidence links
-
-- [AI findings log — currently an empty template](notes/ai-findings.md)
-- [Experiment log — planned work only](notes/experiments.md)
-- [Implementation plan](docs/implementation-plan.md)
-- [Architecture](docs/architecture.md)
-- [API design](docs/api-design.md)
-- [Database design](docs/database-design.md)
-
-The README contains a 15–20 minute English walkthrough outline. It is a checklist only; no video recording is claimed to exist.
+This workflow describes real review decisions, not a claim that every command or performance harness has succeeded on every machine. The README reports the current runnable commands and their environmental requirements. No private prompt chain or hidden reasoning is reproduced here.
