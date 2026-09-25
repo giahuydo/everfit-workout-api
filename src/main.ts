@@ -1,14 +1,19 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger } from 'nestjs-pino';
 import { apiReference } from '@scalar/nestjs-api-reference';
 import { AppModule } from './app.module.js';
+import { HttpExceptionFilter } from './common/http-exception.filter.js';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true, bodyParser: false });
   app.useLogger(app.get(Logger));
-  app.enableShutdownHooks();
+  app.enableShutdownHooks(['SIGTERM', 'SIGINT']);
+  app.useBodyParser('json', { limit: '256kb' });
+  app.useBodyParser('urlencoded', { limit: '256kb', extended: true });
+  app.useGlobalFilters(app.get(HttpExceptionFilter));
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,
     forbidNonWhitelisted: true,
