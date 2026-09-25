@@ -1,7 +1,8 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
 
-export type WeightUnit = 'kg' | 'lb';
+export const WEIGHT_UNITS = ['kg', 'lb'] as const;
+export type WeightUnit = (typeof WEIGHT_UNITS)[number];
 
 @Injectable()
 export class UnitsService {

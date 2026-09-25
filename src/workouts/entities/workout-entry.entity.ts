@@ -1,10 +1,31 @@
-import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, type Relation } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+  type Relation,
+} from 'typeorm';
 import { Exercise } from './exercise.entity.js';
 import { WorkoutSet } from './workout-set.entity.js';
 
 @Entity('workout_entries')
-@Index('idx_workout_entries_user_cursor', ['userId', 'workoutDate', 'createdAt', 'id'])
-@Index('idx_workout_entries_user_exercise_date', ['userId', 'exerciseId', 'workoutDate', 'createdAt', 'id'])
+@Index('idx_workout_entries_user_cursor', [
+  'userId',
+  'workoutDate',
+  'createdAt',
+  'id',
+])
+@Index('idx_workout_entries_user_exercise_date', [
+  'userId',
+  'exerciseId',
+  'workoutDate',
+  'createdAt',
+  'id',
+])
 export class WorkoutEntry {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -22,7 +43,7 @@ export class WorkoutEntry {
   @Column({ name: 'workout_date', type: 'date' })
   workoutDate!: string;
 
-  @CreateDateColumn({ name: 'created_at', type: 'timestamptz', precision: 3 })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz', precision: 6 })
   createdAt!: Date;
 
   @OneToMany(() => WorkoutSet, (set) => set.workoutEntry)

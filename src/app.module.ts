@@ -9,7 +9,9 @@ import { WorkoutsModule } from './workouts/workouts.module.js';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    LoggerModule.forRoot({ pinoHttp: { autoLogging: true, redact: ['req.headers.authorization'] } }),
+    LoggerModule.forRoot({
+      pinoHttp: { autoLogging: true, redact: ['req.headers.authorization'] },
+    }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
@@ -20,7 +22,10 @@ import { WorkoutsModule } from './workouts/workouts.module.js';
         password: config.get<string>('DB_PASSWORD') ?? 'everfit',
         database: config.get<string>('DB_NAME') ?? 'everfit',
         autoLoadEntities: true,
-        synchronize: (config.get<string>('DB_SYNCHRONIZE') ?? 'true') === 'true',
+        // Schema changes are applied through versioned migrations. Keep this opt-in for
+        // disposable local experiments only; it must never be the production default.
+        synchronize:
+          (config.get<string>('DB_SYNCHRONIZE') ?? 'false') === 'true',
         logging: false,
       }),
     }),
