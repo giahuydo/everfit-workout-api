@@ -97,7 +97,13 @@ The service caps request bodies at 256 KiB, validates configuration before datab
 
 ## Schema and performance evidence
 
-The migration creates the normalized exercise catalog, entries, ordered sets, foreign keys, numeric precision, and history indexes. The 50k seed and `EXPLAIN (ANALYZE, BUFFERS)` harness is available at `scripts/perf/run-50k-evidence.sh`; it requires a migrated local PostgreSQL database. No measured query-plan numbers are claimed here unless evidence output is recorded separately.
+The migration creates the normalized exercise catalog, entries, ordered sets, foreign keys, numeric precision, and history indexes. On 2026-09-26 local time, a fresh PostgreSQL 16-alpine container on port 55433 accepted the versioned migration from an empty database: `pnpm migration:run` succeeded and `pnpm migration:show` reported `[X] 1 InitialSchema1770000000000`.
+
+### Measured 50k evidence
+
+The migrated database accepted the 50k harness: 50,000 workout entries, 174,823 sets, seven exercised names, dated 2022-09-27 through 2026-09-25. In one local warm-ish verification run, `EXPLAIN (ANALYZE, BUFFERS)` measured 0.179 ms for the unfiltered first history page, 0.075 ms for a filtered partial-name/date/muscle page, 7.359 ms for a deep keyset page after row 25,001, 30.783 ms for heaviest-set PR, 31.498 ms for highest-volume PR, and 34.247 ms for estimated 1RM. Existing indexes were used for history and user/exercise/date filtering.
+
+These are query-plan timings from one local verification run, not throughput measurements or general production-latency claims. `pnpm test:e2e` passed 19 tests in one file after the fixes; `pnpm test` passed 9 tests in three files. The harness remains available at `scripts/perf/run-50k-evidence.sh` for a migrated local PostgreSQL database.
 
 ## Trade-offs
 

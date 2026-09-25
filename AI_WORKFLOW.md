@@ -12,8 +12,11 @@ The following cases are supported by the retained AI findings evidence; they are
 | Numeric transport | Require decimal-string weights in the public JSON API. | Rejected. The public contract requires JSON-number `weight`; decimal-safe conversion is internal and the database uses `NUMERIC`. |
 | PR lookup/no-data | Make PR lookup exercise-ID based and return `404` for an unknown exercise. | Rejected. The endpoint is exact normalized exercise-name lookup; a valid no-data request returns `200` with null records and a message. |
 | Cursor ordering | Page same-day history by `(workout_date, id)` only. | Corrected as suboptimal. The implementation uses `(workout_date, created_at, id)` and preserves six-digit microseconds in the cursor so ingestion ordering is deterministic without treating it as workout time. |
+| Generated E2E suite | Generated test coverage in `bcecfe9` expected `pageInfo.nextCursor`, a removed `deltaAminusB`, and a wrong `achievedDate`; it also enabled implicit conversion and omitted the production global `HttpExceptionFilter`. | A real database-backed run found 12 failures. Human/orchestrator classified them as product defects or stale assertions, aligned the harness and contracts in `6259c48`, standardized validation-error details in `6dd112b`, and obtained 19/19 green. This is a strong wrong/suboptimal AI coding/testing example, not a claim about hidden reasoning. |
 
 The first three are rejected suggestions; the last is a reviewed design correction. The first two also satisfy the required examples of suboptimal/wrong output followed by a human correction.
+
+The verification loop for generated tests was: generated tests → actual database run → failures classified as product defect versus stale assertion → corrections → 19/19 green. The test suite was evidence to review, not evidence to accept unexamined.
 
 ## Working practices
 
