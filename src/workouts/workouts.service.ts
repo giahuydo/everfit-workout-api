@@ -332,8 +332,10 @@ export class WorkoutsService {
     return Number(hour) <= 23 && Number(minute) <= 59 && Number(second) <= 59;
   }
 
+  // Match any PostgreSQL uuid value (canonical 8-4-4-4-12 text), not only
+  // RFC 4122 v1-5: ids such as md5(...)::uuid are valid keys in the table.
   private isUuid(value: string): boolean {
-    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
       value,
     );
   }

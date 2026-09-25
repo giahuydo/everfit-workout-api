@@ -89,7 +89,8 @@ export class PersonalRecordsService {
   private mapWinner(metric: Metric, row: WinnerRow, unit: WeightUnit) {
     const weight = this.units.fromKg(row.weight_kg, unit);
     const value = metric === 'highestVolume'
-      ? new Decimal(this.units.fromKg(row.weight_kg, unit, 6)).times(row.reps).toDecimalPlaces(3, Decimal.ROUND_HALF_UP).toNumber()
+      // Multiply exact canonical kg first; convert and round the total once.
+      ? this.units.volumeFromKg(new Decimal(row.weight_kg).times(row.reps).toFixed(), unit)
       : this.units.fromKg(row.metric_value, unit);
     return {
       entryId: row.entry_id,

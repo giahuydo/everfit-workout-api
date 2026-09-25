@@ -39,7 +39,7 @@ pnpm migration:show
 pnpm migration:run
 ```
 
-`test` runs the contract/unit suite. `test:e2e` is separate and requires the local PostgreSQL configuration.
+`test` runs the contract/unit suite. `test:e2e` is separate and requires the local PostgreSQL configuration. The workflow suite boots with `DB_SYNCHRONIZE=true` for speed; `test/migrations.e2e-spec.ts` (also runnable alone via `pnpm test:e2e:migrations`) recreates a fresh database, applies the single versioned initial migration, and runs a representative log/history/PR flow with `DB_SYNCHRONIZE=false`.
 
 ## API behavior
 
@@ -105,7 +105,7 @@ The migration creates the normalized exercise catalog, entries, ordered sets, fo
 
 The migrated database accepted the 50k harness: 50,000 workout entries, 174,823 sets, seven exercised names, dated 2022-09-27 through 2026-09-25. In one local warm-ish verification run, `EXPLAIN (ANALYZE, BUFFERS)` measured 0.179 ms for the unfiltered first history page, 0.075 ms for a filtered partial-name/date/muscle page, 7.359 ms for a deep keyset page after row 25,001, 30.783 ms for heaviest-set PR, 31.498 ms for highest-volume PR, and 34.247 ms for estimated 1RM. Existing indexes were used for history and user/exercise/date filtering.
 
-These are query-plan timings from one local verification run, not throughput measurements or general production-latency claims. `pnpm test:e2e` passed 19 tests in one file after the fixes; `pnpm test` passed 9 tests in three files. The harness remains available at `scripts/perf/run-50k-evidence.sh` for a migrated local PostgreSQL database.
+These are query-plan timings from one local verification run, not throughput measurements or general production-latency claims. They were measured with the earlier `LIMIT 51` history lookahead and PR ties ending at `set_order`; the current harness uses the service’s `LIMIT 21` lookahead and final `ws.id` tie key and has not been remeasured. `pnpm test:e2e` passed 19 tests in one file after the fixes; `pnpm test` passed 9 tests in three files. The harness remains available at `scripts/perf/run-50k-evidence.sh` for a migrated local PostgreSQL database.
 
 ## Trade-offs
 

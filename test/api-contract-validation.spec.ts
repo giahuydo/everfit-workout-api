@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { createHash } from 'node:crypto';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { describe, expect, it } from 'vitest';
@@ -58,6 +59,46 @@ describe('API contract validation', () => {
     expect(decode(valid)).toEqual(valid);
     expect(() => decode({ ...valid, createdAt: '2026-09-25T12:30:00.123Z' })).toThrow('Invalid cursor');
     expect(() => decode({ ...valid, id: 'not-a-uuid' })).toThrow('Invalid cursor');
+  });
+
+  it('accepts any PostgreSQL uuid as a cursor id, including non-RFC md5(...)::uuid keys', () => {
+    const service = new WorkoutsService({} as never, {} as never, {} as never, {} as never, {} as never);
+    const decode = (value: object) => (service as any).decodeCursor(
+      Buffer.from(JSON.stringify(value)).toString('base64url'),
+      'scope',
+    );
+    // SELECT md5('everfit-perf-entry-1')::uuid — version nibble and variant are arbitrary.
+    const md5Id = createHash('md5').update('everfit-perf-entry-1').digest('hex')
+      .replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, '$1-$2-$3-$4-$5');
+    const base = { v: 1, date: '2026-09-25', createdAt: '2026-09-25T12:30:00.123456Z', scope: 'scope' };
+
+    for (const id of [md5Id, '00000000-0000-0000-0000-000000000000', 'ffffffff-ffff-cfff-3fff-ffffffffffff', 'ABCDEF01-2345-6789-ABCD-EF0123456789']) {
+      expect(decode({ ...base, id })).toEqual({ ...base, id });
+    }
+    for (const id of ['', 'not-a-uuid', '550e8400e29b41d4a716446655440000', '{550e8400-e29b-41d4-a716-446655440000}', '550e8400-e29b-41d4-a716-44665544000g', '550e8400-e29b-41d4-a716-4466554400000', "550e8400-e29b-41d4-a716-446655440000' OR 1=1"]) {
+      expect(() => decode({ ...base, id })).toThrow('Invalid cursor');
+    }
+  });
+
+  it('computes highestVolume from exact canonical kg x reps, converting and rounding once', () => {
+    const service = new PersonalRecordsService({} as never, new UnitsService());
+    const winner = {
+      entry_id: 'entry-uuid',
+      set_id: 'set-uuid',
+      reps: 10,
+      weight_kg: '40.000111',
+      metric_value: '400.001110',
+      workout_date: '2026-09-25',
+    };
+    // 400.00111 kg / 0.45359237 = 881.85149587... lb·reps -> 881.851.
+    // Rounding the converted weight first (88.185150 lb x 10 = 881.8515) would give 881.852.
+    expect((service as any).mapWinner('highestVolume', winner, 'lb')).toEqual(expect.objectContaining({
+      weight: 88.185,
+      unit: 'lb',
+      value: 881.851,
+      valueUnit: 'lb·reps',
+    }));
+    expect((service as any).mapWinner('highestVolume', winner, 'kg').value).toBe(400.001);
   });
 
   it('maps personal-record winners to the documented public fields', () => {
