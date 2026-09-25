@@ -1,3 +1,5 @@
+import { resolve } from 'node:path';
+
 const NODE_ENVS = new Set(['development', 'test', 'production']);
 
 type Environment = Record<string, string | number | boolean | undefined>;
@@ -27,6 +29,11 @@ export function validateEnvironment(env: NodeJS.ProcessEnv): Environment {
     throw new Error('DB_PASSWORD must be explicitly set to a non-default value in production');
   }
 
+  const catalogPath = env.EXERCISE_CATALOG_PATH;
+  if (catalogPath !== undefined && !catalogPath.trim()) {
+    throw new Error('EXERCISE_CATALOG_PATH must be a non-blank file path when set');
+  }
+
   return {
     ...env,
     NODE_ENV: nodeEnv,
@@ -45,5 +52,7 @@ export function validateEnvironment(env: NodeJS.ProcessEnv): Environment {
     DB_STATEMENT_TIMEOUT_MS: integer(env.DB_STATEMENT_TIMEOUT_MS, 'DB_STATEMENT_TIMEOUT_MS', 15_000, { min: 100, max: 120_000 }),
     DB_LOCK_TIMEOUT_MS: integer(env.DB_LOCK_TIMEOUT_MS, 'DB_LOCK_TIMEOUT_MS', 5_000, { min: 100, max: 120_000 }),
     DB_IDLE_TRANSACTION_TIMEOUT_MS: integer(env.DB_IDLE_TRANSACTION_TIMEOUT_MS, 'DB_IDLE_TRANSACTION_TIMEOUT_MS', 30_000, { min: 1_000, max: 600_000 }),
+    // Unset means the packaged config/exercises.json; relative paths resolve from the working directory.
+    EXERCISE_CATALOG_PATH: catalogPath === undefined ? undefined : resolve(catalogPath.trim()),
   };
 }

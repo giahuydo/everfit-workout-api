@@ -1,5 +1,5 @@
 import { IsIn, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
-import type { WeightUnit } from '../../units/units.service.js';
+import { WEIGHT_UNITS, type WeightUnit } from '../../units/units.service.js';
 
 export class PrQueryDto {
   @IsString() @Matches(/\S/) @MaxLength(120)
@@ -11,7 +11,7 @@ export class PrQueryDto {
   @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/)
   to?: string;
 
-  @IsOptional() @IsIn(['kg', 'lb'])
+  @IsOptional() @IsIn(WEIGHT_UNITS)
   unit: WeightUnit = 'kg';
 }
 
@@ -28,6 +28,6 @@ export class ComparePrQueryDto {
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
   rangeBTo!: string;
 
-  @IsOptional() @IsIn(['kg', 'lb'])
+  @IsOptional() @IsIn(WEIGHT_UNITS)
   unit: WeightUnit = 'kg';
 }

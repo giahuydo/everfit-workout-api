@@ -61,7 +61,9 @@ pnpm migration:run
 
 Workout dates are validated `YYYY-MM-DD` values and stored as PostgreSQL `DATE`. `created_at` is a UTC ingestion timestamp, never a claimed workout time. Input weights remain JSON numbers; the service stores submitted original values plus decimal-safe canonical kg (`NUMERIC`), with `1 lb = 0.45359237 kg`. The whole request is transactional. The response has one entry per submitted exercise occurrence and preserves submitted weight/unit values.
 
-The shared exercise catalog is configured/seeded outside the API. There is intentionally no catalog-admin endpoint.
+The shared exercise catalog (name → muscle group) is data in `config/exercises.json`, loaded and validated at startup; set `EXERCISE_CATALOG_PATH` to use another file. Entries are `{"name": string, "muscleGroup": string | null}`; startup fails on blank or over-long names, invalid muscle groups, or duplicate normalized names. Seeding inserts missing exercises only and never overwrites metadata already in the database, so changing an existing row's muscle group requires a database update. There is intentionally no catalog-admin endpoint.
+
+Supported weight units come from the shared `WEIGHT_UNITS` registry and kg factors in `src/units/units.service.ts`; request and query DTOs validate against that registry, so adding a unit such as stone is a registry-plus-factor change.
 
 ### History
 

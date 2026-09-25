@@ -1,0 +1,7 @@
+[
+  { "name": "Back Squat", "muscleGroup": "legs" },
+  { "name": "Bench Press", "muscleGroup": "chest" },
+  { "name": "Deadlift", "muscleGroup": "back" },
+  { "name": "Overhead Press", "muscleGroup": "shoulders" },
+  { "name": "Pull Up", "muscleGroup": "back" }
+]

@@ -13,4 +13,13 @@ describe('validateEnvironment', () => {
     expect(() => validateEnvironment({ PORT: 'invalid' })).toThrow('PORT');
     expect(() => validateEnvironment({ NODE_ENV: 'production' })).toThrow('DB_PASSWORD');
   });
+
+  it('resolves an optional exercise catalog path override', () => {
+    expect(validateEnvironment({}).EXERCISE_CATALOG_PATH).toBeUndefined();
+    expect(validateEnvironment({ EXERCISE_CATALOG_PATH: '/etc/everfit/exercises.json' }).EXERCISE_CATALOG_PATH)
+      .toBe('/etc/everfit/exercises.json');
+    expect(validateEnvironment({ EXERCISE_CATALOG_PATH: 'config/exercises.json' }).EXERCISE_CATALOG_PATH)
+      .toBe(`${process.cwd()}/config/exercises.json`);
+    expect(() => validateEnvironment({ EXERCISE_CATALOG_PATH: '  ' })).toThrow('EXERCISE_CATALOG_PATH');
+  });
 });

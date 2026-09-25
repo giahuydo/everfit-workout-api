@@ -1,6 +1,6 @@
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
-import type { WeightUnit } from '../../units/units.service.js';
+import { WEIGHT_UNITS, type WeightUnit } from '../../units/units.service.js';
 
 export class HistoryQueryDto {
   @IsOptional() @IsString() @Matches(/\S/) @MaxLength(120)
@@ -15,7 +15,7 @@ export class HistoryQueryDto {
   @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/)
   to?: string;
 
-  @IsOptional() @IsIn(['kg', 'lb'])
+  @IsOptional() @IsIn(WEIGHT_UNITS)
   unit: WeightUnit = 'kg';
 
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100)
