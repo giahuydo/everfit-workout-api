@@ -142,6 +142,7 @@ describe('workout assignment workflows', () => {
   it.each([
     ['invalid unit', workout('Bench Press', [{ reps: 5, weight: 80, unit: 'stone' }])],
     ['non-calendar date', workout('Bench Press', [{ reps: 5, weight: 80, unit: 'kg' }], '2026-02-30')],
+    ['PostgreSQL-incompatible year zero', workout('Bench Press', [{ reps: 5, weight: 80, unit: 'kg' }], '0000-01-01')],
     ['null weight', workout('Bench Press', [{ reps: 5, weight: null, unit: 'kg' }])],
     ['negative weight', workout('Bench Press', [{ reps: 5, weight: -1, unit: 'kg' }])],
     ['negative reps', workout('Bench Press', [{ reps: -1, weight: 1, unit: 'kg' }])],
@@ -188,6 +189,12 @@ describe('workout assignment workflows', () => {
       .toEqual([['Incline Bench Press', '2026-09-21'], ['Bench Press', '2026-09-20']]);
   });
 
+  it('rejects PostgreSQL-incompatible year-zero history bounds', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/v1/users/history-user/workouts?from=0000-01-01&to=2026-01-31');
+    expectValidationFailure(response);
+  });
+
   it('returns a successful documented no-data history page', async () => {
     const response = await request(app.getHttpServer()).get('/v1/users/no-history-user/workouts?from=2026-01-01&to=2026-01-31');
     expect(response.status).toBe(200);
@@ -226,6 +233,13 @@ describe('workout assignment workflows', () => {
     const scoped = await request(app.getHttpServer())
       .get(`/v1/users/another-user/workouts?limit=1&cursor=${encodeURIComponent(first.body.page.nextCursor as string)}`);
     expectValidationFailure(scoped);
+
+    const blankGroupFirst = await request(app.getHttpServer())
+      .get('/v1/users/cursor-scope-user/workouts?limit=1&muscleGroup=%20%20%20');
+    expect(blankGroupFirst.status).toBe(200);
+    const equivalentScope = await request(app.getHttpServer())
+      .get(`/v1/users/cursor-scope-user/workouts?limit=1&cursor=${encodeURIComponent(blankGroupFirst.body.page.nextCursor as string)}`);
+    expect(equivalentScope.status).toBe(200);
   });
 
   it('keeps concurrent same-user/exercise writes as separate entries', async () => {

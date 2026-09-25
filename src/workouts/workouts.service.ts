@@ -282,7 +282,9 @@ export class WorkoutsService {
       exerciseName: query.exerciseName?.trim()
         ? normalizeExerciseName(query.exerciseName)
         : null,
-      muscleGroup: query.muscleGroup?.trim().toLowerCase() ?? null,
+      muscleGroup: query.muscleGroup?.trim()
+        ? query.muscleGroup.trim().toLowerCase()
+        : null,
       from: query.from ?? null,
       to: query.to ?? null,
       unit,

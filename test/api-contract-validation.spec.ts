@@ -7,6 +7,7 @@ import { HistoryQueryDto } from '../src/workouts/dto/history-query.dto.js';
 import { LogWorkoutDto } from '../src/workouts/dto/log-workout.dto.js';
 import { ComparePrQueryDto, PrQueryDto } from '../src/workouts/dto/pr-query.dto.js';
 import { PersonalRecordsService } from '../src/personal-records/personal-records.service.js';
+import { assertCalendarDate } from '../src/common/date.js';
 import { UnitsService, WEIGHT_UNITS } from '../src/units/units.service.js';
 import { WorkoutsService } from '../src/workouts/workouts.service.js';
 
@@ -27,6 +28,20 @@ describe('API contract validation', () => {
     }
     const errors = await validate(plainToInstance(Dto as any, { ...base, unit: 'stone' }));
     expect(errors.map((error) => error.property)).toEqual(['unit']);
+  });
+
+
+  it('rejects PostgreSQL-incompatible year zero at the API date boundary', () => {
+    expect(() => assertCalendarDate('0000-01-01')).toThrow('date is not a valid calendar date');
+    expect(assertCalendarDate('0001-01-01')).toBe('0001-01-01');
+  });
+
+  it('treats blank muscle-group spelling as the same effective cursor scope as omission', () => {
+    const service = new WorkoutsService({} as never, {} as never, {} as never, {} as never, {} as never);
+    const scope = (query: HistoryQueryDto) => (service as any).cursorScope('scope-user', query, 'kg', 20);
+
+    expect(scope(plainToInstance(HistoryQueryDto, {})))
+      .toBe(scope(plainToInstance(HistoryQueryDto, { muscleGroup: '   ' })));
   });
 
   it('rejects numeric strings in workout request bodies', async () => {
