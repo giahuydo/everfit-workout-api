@@ -5,11 +5,11 @@ Internal working notes. They are not part of the README/AI_WORKFLOW submission a
 **Status values**
 - `proposed`: not in the code on this branch.
 - `applied`: the cited code or artifact exists on this branch, but no test or measurement specifically covers it.
-- `verified`: covered by the 2026-09-26 passing run on this branch (`pnpm build` pass, `pnpm lint` 0 warnings/0 errors, `pnpm test` 34/34 in 7 files, `pnpm test:e2e` 21/21 in 2 files, `pnpm test:e2e:migrations` 2/2), the local migration run, or the recorded 50k evidence in [`notes/evidence/`](evidence/README.md).
+- `verified`: covered by the 2026-09-26 passing run on this branch (`pnpm build` pass, `pnpm lint` 0 warnings/0 errors, `pnpm test` 36/36 in 7 files, `pnpm test:e2e` 23/23 in 2 files, `pnpm test:e2e:migrations` 2/2), the local migration run, or the recorded 50k evidence in [`notes/evidence/`](evidence/README.md).
 - `open`: a known defect or gap.
 - `rejected`: considered and deliberately not done.
 
-Re-reconciled on 2026-09-26 against branch `final/docs-v2`, which contains `f611fd3` (JSON catalog, shared unit registry), `a920c68` (UUID defaults), `559d630` (PR volume rounding, PostgreSQL UUID cursors, migration-backed e2e, perf SQL parity), and `a5046ed` (workflow e2e database recreated per run). No row below depends on an unmerged branch.
+Re-reconciled on 2026-09-26 against promoted `main` at `9f6ad9b`. The verified integration history includes `f611fd3` (JSON catalog, shared unit registry), `a920c68` (UUID defaults), `559d630` (PR volume rounding, PostgreSQL UUID cursors, migration-backed e2e, perf SQL parity), and `a5046ed` (workflow e2e database recreated per run). No row below depends on an unmerged branch.
 
 Attributable AI mistakes and rejections belong in [the AI error/rejection ledger](ai-findings.md), not here. An improvement row is not AI-mistake evidence.
 
@@ -45,6 +45,10 @@ Attributable AI mistakes and rejections belong in [the AI error/rejection ledger
 | `explain-50k.sql` uses the service's `LIMIT 21` lookahead and final `ws.id` PR tie key | A32, A62 | **applied** | `559d630`. The recorded 50k timings used the earlier shape and have not been remeasured |
 | Reproducible 50k seed/explain harness with evidence committed to the repo | A32, A62 | **verified** (one run) | `scripts/perf/`; [`notes/evidence/`](evidence/README.md) |
 | Pin pnpm 10.28.2 for deterministic host/Docker installs | A59, A81 | **verified** | `2557505`: `package.json#packageManager` and Docker `corepack prepare`; initial clean build failed when Corepack selected pnpm 12.6.0 and its minimum-release-age policy rejected fresh lockfile packages; no-cache rebuild passed with the pin |
+| Bind Compose PostgreSQL to loopback and reuse configurable `DB_PORT` | A59, A81 | **verified** | `cf2b8d5`: Compose config resolves `host_ip: 127.0.0.1`; clean stack used a non-default host DB port, migration exited 0, app became healthy, live/ready returned 200, POST smoke returned 201 |
+| Reject PostgreSQL-incompatible year zero and canonicalize blank muscle-group cursor scope | A06, A13, A14, A24 | **verified** | `1ce7daf`, `9c35f06`: unit/contract + DB-backed E2E regressions; current suite 36/36 unit and 23/23 E2E |
+| Load migration CLI configuration from the same validated `.env`/environment contract as the app | A59, A81 | **verified** | `68dc701`: TypeORM data source loads `.env` and calls `validateEnvironment`; a separate env-file smoke check confirmed DB host/port/user/password/name are read from `.env` |
+| Run the final fresh-clone DB-backed gate against an explicit disposable PostgreSQL instance instead of ambient local credentials | A56–A59, A81 | **verified** | After `main` promotion, the first clean-clone E2E attempt hit an unrelated local PostgreSQL password mismatch. Re-running the same clean checkout against a dedicated PostgreSQL 16 container with explicit `DB_*` values passed `pnpm test:e2e` 23/23 and `pnpm test:e2e:migrations` 2/2. This is verification isolation, not a product-code fix or AI mistake |
 
 ## Proposed / open (not implemented)
 

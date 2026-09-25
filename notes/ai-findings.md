@@ -25,7 +25,7 @@ Supply the immutable assignment plus concrete API/ADR contracts before asking fo
 
 ## Current-state reconciliation (2026-09-26)
 
-Checked against branch `final/docs-v2` (including `f611fd3`, `a920c68`, `559d630`, and `a5046ed`) and the 2026-09-26 run on it: `pnpm test` 32/32 in 6 files, `pnpm test:e2e` 21/21 in 2 files, `pnpm test:e2e:migrations` 2/2. The original AI-07 figures (`pnpm test` 9/9, `pnpm test:e2e` 19/19) describe the earlier state. This section only reclassifies existing rows. It adds no new AI provenance.
+Checked against branch `final/docs-v2` (including `f611fd3`, `a920c68`, `559d630`, and `a5046ed`) and the 2026-09-26 run on it: `pnpm test` 32/32 in 6 files, `pnpm test:e2e` 23/23 in 2 files, `pnpm test:e2e:migrations` 2/2. The original AI-07 figures (`pnpm test` 9/9, `pnpm test:e2e` 19/19) describe the earlier state. This section only reclassifies existing rows. It adds no new AI provenance.
 
 | ID | Stale statement in the row | Current classification | Evidence |
 |---|---|---|---|
@@ -40,3 +40,10 @@ Checked against branch `final/docs-v2` (including `f611fd3`, `a920c68`, `559d630
 The "Non-cases" note that "IR-11 remains a documented SQL-vs-contract mismatch" is also superseded by the AI-06 resolution above.
 
 **Not recorded as AI cases:** the missing UUID defaults and the workflow e2e suite reusing a pre-existing test database (fixed in `a5046ed` by dropping and recreating it each run) are verification/process findings. No retained session record shows which agent or person introduced either, so they are logged in the [improvement log](improvements-log.md), not here.
+
+## Final adversarial-review reconciliation (2026-09-26)
+
+- A late Pi review repeated the earlier PR-volume rounding problem after `c9ccbc9` had already corrected it. Current source and the regression in `test/api-contract-validation.spec.ts` confirm the live defect is resolved. Treat that repeated finding as **STALE / FALSE_POSITIVE for current HEAD**, not a new defect.
+- A late Pi review claimed production `DB_SYNCHRONIZE=true` was still accepted, but `b3049d9` already rejects it in `validateEnvironment`. This was also **STALE / FALSE_POSITIVE for current HEAD**.
+- Cursor's final adversarial pass challenged a subagent suggestion to move the captured application DB name into `beforeAll`; Cursor correctly rejected that change because the guard intentionally snapshots the externally configured DB name before the test overwrites `process.env.DB_NAME`. **REJECTED reviewer suggestion; no code change.**
+- The final verification itself found two real non-AI issues after earlier green runs: static E2E imports read DB configuration before per-test environment setup (`15eef97`), and the migration CLI did not share the app's `.env` loading/validation path (`68dc701`). These are recorded as verification/process findings, not fabricated AI errors.

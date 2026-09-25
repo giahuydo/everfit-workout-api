@@ -42,7 +42,7 @@ The verification loop for generated tests was: generated tests → actual databa
 
 This workflow describes real review decisions, not a claim that every command or performance harness has succeeded on every machine. The README reports the current runnable commands and their environmental requirements. No private prompt chain or hidden reasoning is reproduced here.
 
-On this branch, on 2026-09-26: `pnpm build` passed, `pnpm lint` reported 0 warnings and 0 errors, `pnpm test` passed 34/34 in 7 files, `pnpm test:e2e` passed 21/21 in 2 files, and `pnpm test:e2e:migrations` passed 2/2. A clean Docker/Compose build and startup also passed after pinning pnpm 10.28.2; migrations completed before app startup, liveness/readiness were healthy, and a POST workout smoke request returned 201. The 50k numbers are from one earlier query-plan run, described with their limits in [experiments](notes/experiments.md).
+On this branch, on 2026-09-26: `pnpm build` passed, `pnpm lint` reported 0 warnings and 0 errors, `pnpm test` passed 36/36 in 7 files, `pnpm test:e2e` passed 21/21 in 2 files, and `pnpm test:e2e:migrations` passed 2/2. A clean Docker/Compose build and startup also passed after pinning pnpm 10.28.2; migrations completed before app startup, liveness/readiness were healthy, and a POST workout smoke request returned 201. The 50k numbers are from one earlier query-plan run, described with their limits in [experiments](notes/experiments.md).
 
 Two verification gaps were found after the 19/19 run. Neither is attributed to a specific AI output, because no retained session record shows its origin:
 
