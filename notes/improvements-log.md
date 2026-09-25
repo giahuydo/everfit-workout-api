@@ -5,7 +5,7 @@ Internal working notes. They are not part of the README/AI_WORKFLOW submission a
 **Status values**
 - `proposed`: not in the code on this branch.
 - `applied`: the cited code or artifact exists on this branch, but no test or measurement specifically covers it.
-- `verified`: covered by the 2026-09-26 passing run on this branch (`pnpm build` pass, `pnpm lint` 0 warnings/0 errors, `pnpm test` 32/32 in 6 files, `pnpm test:e2e` 21/21 in 2 files, `pnpm test:e2e:migrations` 2/2), the local migration run, or the recorded 50k evidence in [`notes/evidence/`](evidence/README.md).
+- `verified`: covered by the 2026-09-26 passing run on this branch (`pnpm build` pass, `pnpm lint` 0 warnings/0 errors, `pnpm test` 34/34 in 7 files, `pnpm test:e2e` 21/21 in 2 files, `pnpm test:e2e:migrations` 2/2), the local migration run, or the recorded 50k evidence in [`notes/evidence/`](evidence/README.md).
 - `open`: a known defect or gap.
 - `rejected`: considered and deliberately not done.
 
@@ -39,11 +39,12 @@ Attributable AI mistakes and rejections belong in [the AI error/rejection ledger
 | Validation errors always return `details` as an array; 5xx returns `details: null` | A43, A54 | **verified** | `6dd112b`; filter unit tests |
 | DB pool, statement, lock, and idle-transaction timeouts validated at boot; production rejects the default password | A61 | **verified** | `src/config/environment.ts`; `environment.spec.ts` |
 | Liveness/readiness endpoints, graceful `SIGTERM`/`SIGINT` shutdown | A59–A60 | **applied** | `src/health.controller.ts`; `enableShutdownHooks` in `main.ts`. `/health/ready` returned `{"status":"ok","checks":{"database":"up"}}` in the 2026-09-26 docs-example run; shutdown is not tested |
-| Compose `migrate` one-shot service gates `app` startup | A59, A81 | **applied** | `docker-compose.yml`. The UUID-default blocker is fixed (`a920c68`), but the Compose path has not been run end to end on this branch |
+| Compose `migrate` one-shot service gates `app` startup | A59, A81 | **verified** | `docker-compose.yml`; 2026-09-26 clean Compose run: image build passed, migration service exited 0, app started after migration, `/health/live` and `/health/ready` returned 200, POST workout returned 201 |
 | Migration-backed e2e (fresh DB, versioned migrations, `DB_SYNCHRONIZE=false`, log/history-cursor/PR flow) | A37–A39, A59 | **verified** | `559d630`: `test/migrations.e2e-spec.ts`, `pnpm test:e2e:migrations` 2/2 |
 | Workflow e2e drops and recreates its database each run instead of reusing an existing one | A56–A58 | **verified** | `a5046ed`: `test/workout-workflows.e2e-spec.ts` `beforeAll`; `pnpm test:e2e` 21/21. Before this, `CREATE DATABASE` ran only when the database was missing, so schema or data left by an earlier run or branch could carry into the next run. This is a test-isolation fix, not a recorded AI mistake |
 | `explain-50k.sql` uses the service's `LIMIT 21` lookahead and final `ws.id` PR tie key | A32, A62 | **applied** | `559d630`. The recorded 50k timings used the earlier shape and have not been remeasured |
 | Reproducible 50k seed/explain harness with evidence committed to the repo | A32, A62 | **verified** (one run) | `scripts/perf/`; [`notes/evidence/`](evidence/README.md) |
+| Pin pnpm 10.28.2 for deterministic host/Docker installs | A59, A81 | **verified** | `2557505`: `package.json#packageManager` and Docker `corepack prepare`; initial clean build failed when Corepack selected pnpm 12.6.0 and its minimum-release-age policy rejected fresh lockfile packages; no-cache rebuild passed with the pin |
 
 ## Proposed / open (not implemented)
 

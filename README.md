@@ -11,7 +11,7 @@ HTTP/JSON → NestJS controllers → services → PostgreSQL
 
 ## Run locally
 
-Prerequisites: Node.js 22, pnpm, and Docker.
+Prerequisites: Node.js 22, pnpm 10.28.2 (pinned in `package.json` and the Docker build), and Docker.
 
 ### Option A: everything in Compose (reproducible path)
 
@@ -186,7 +186,7 @@ The indexes were kept unchanged because these plans were acceptable at the 50k t
 
 ### Test evidence
 
-Verified on this branch on 2026-09-26: `pnpm build` passed; `pnpm lint` reported 0 warnings and 0 errors; `pnpm test` passed 32/32 tests in 6 files; `pnpm test:e2e` passed 21/21 tests in 2 DB-backed files; and `pnpm test:e2e:migrations` passed 2/2.
+Verified on this branch on 2026-09-26: `pnpm build` passed; `pnpm lint` reported 0 warnings and 0 errors; `pnpm test` passed 34/34 tests in 7 files; `pnpm test:e2e` passed 21/21 tests in 2 DB-backed files; and `pnpm test:e2e:migrations` passed 2/2. A clean Compose build also passed after pinning pnpm 10.28.2; the one-shot migration service exited 0, `/health/live` and `/health/ready` returned 200, and a POST workout smoke request returned 201.
 
 An earlier run (9 unit tests, 19 workflow e2e tests) passed while startup on a migrated database failed, because the workflow suite builds its schema with `DB_SYNCHRONIZE=true` and so checks the entity model rather than the migrated schema. The migration-backed e2e file and a migration unit test now cover that path. The workflow suite also used to reuse its test database if it already existed; it now drops and recreates it on every run, so leftover schema or rows from earlier runs cannot affect results.
 
