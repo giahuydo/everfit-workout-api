@@ -3,6 +3,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { LoggerModule } from 'nestjs-pino';
 import { HealthController } from './health.controller.js';
+import { UnitsModule } from './units/units.module.js';
+import { WorkoutsModule } from './workouts/workouts.module.js';
 
 @Module({
   imports: [
@@ -22,6 +24,8 @@ import { HealthController } from './health.controller.js';
         logging: false,
       }),
     }),
+    UnitsModule,
+    WorkoutsModule,
   ],
   controllers: [HealthController],
 })
