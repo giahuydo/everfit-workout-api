@@ -1,6 +1,6 @@
 # ADR 001 — PostgreSQL
 
-Status: proposed for implementation.
+Status: accepted and implemented. PostgreSQL with TypeORM and versioned migrations (`src/database/migrations/`, `synchronize: false` in `src/database/data-source.ts`); migration from an empty database and 50k query plans were verified locally (see [experiments](../../notes/experiments.md)). The initial migration creates `uuid_generate_v4()` primary-key defaults (`a920c68`), which runtime catalog seeding needs; this is covered by `src/database/migrations/1770000000000-initial-schema.spec.ts` and by `test/migrations.e2e-spec.ts`, which boots the app on a freshly migrated database with `DB_SYNCHRONIZE=false`.
 
 ## Context
 

@@ -1,6 +1,6 @@
 # ADR 004 — Cursor Pagination
 
-Status: proposed for implementation.
+Status: accepted and implemented. Keyset `(workout_date DESC, created_at DESC, id DESC)` with six-digit UTC microsecond cursor keys and a scope hash (`src/workouts/workouts.service.ts`); cursor ids accept any canonical PostgreSQL `uuid` text, not only RFC 4122 v1–5 (`559d630`). Covered by cursor-shape, malformed-cursor, scope-mismatch, and non-RFC-UUID tests, plus migration-backed paging across `md5(...)::uuid` keys. Deep-page cost limitation measured in [experiments](../../notes/experiments.md).
 
 ## Context
 

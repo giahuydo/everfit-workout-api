@@ -1,0 +1,2 @@
+# Verbatim psql evidence keeps its original trailing spaces.
+notes/evidence/*.out -whitespace

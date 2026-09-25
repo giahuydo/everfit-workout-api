@@ -1,5 +1,7 @@
 # Everfit Workout API — Implementation Plan
 
+> **Historical planning snapshot, not current truth.** This plan was written on 2026-09-25 before any implementation (commit `8a542b3`) and is kept to show how the work was decomposed. Its "planned", "proposed", and "not passed" wording reflects that moment. For current behavior, see the root [README](../README.md), the code, the [ADRs](decisions/001-postgresql.md) (now accepted), [experiments](../notes/experiments.md), and the [improvement log](../notes/improvements-log.md). The actual commit titles and grouping differ from the planned ones; see `git log`.
+
 **Status:** Planning draft. Source-to-plan mapping is complete for the supplied Everfit assignment checklist (items 1–12); implementation, testing, benchmarks, commits, GitHub delivery, README, AI workflow and video remain future work. A pre-start estimate was communicated externally; no number is restated here.
 
 The complete A01–A102 requirement → design → phase → planned verification → deliverable matrix is in [internal traceability](../notes/requirement-traceability.md). Consult [API design](api-design.md), [database design](database-design.md), [architecture](architecture.md) and [ADRs](decisions/001-postgresql.md) for contracts and trade-offs.

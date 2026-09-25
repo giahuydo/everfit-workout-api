@@ -1,5 +1,7 @@
 # Requirement Traceability — Everfit assignment (internal reference)
 
+> **Historical planning snapshot, not current truth.** This A01–A102 matrix was written before implementation, and every "planned" or "future" cell reflects that moment. It has not been re-scored row by row against the delivered code. For current status, see the root [README](../README.md), [AI workflow](../AI_WORKFLOW.md), [experiments](experiments.md), the [improvement log](improvements-log.md), and the [video checklist](../docs/video-walkthrough-checklist.md). The video (A88–A94) has not been recorded yet.
+
 This detailed matrix is split from [the concise implementation plan](../docs/implementation-plan.md). All A01–A102 rows, source classifications, proposed decisions, planned verification, and future deliverable evidence are retained. Keep this internal reference in sync with the plan and the assignment; do not treat planned tests or artifacts as completed.
 
 ## Assignment-to-deliverable traceability (planning only)

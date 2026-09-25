@@ -1,0 +1,19 @@
+BEGIN
+DELETE 0
+INSERT 0 8
+INSERT 0 50000
+INSERT 0 174823
+ANALYZE
+ANALYZE
+ANALYZE
+COMMIT
+ entries | exercises | oldest_date | newest_date 
+---------+-----------+-------------+-------------
+   50000 |         7 | 2022-09-27  | 2026-09-25
+(1 row)
+
+  sets  
+--------
+ 174823
+(1 row)
+

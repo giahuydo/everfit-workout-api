@@ -1,6 +1,6 @@
 # ADR 003 — Workout Date and Timezone Semantics
 
-Status: proposed for implementation.
+Status: accepted and implemented. `workout_date DATE` plus UTC `created_at TIMESTAMPTZ(6)`; no `performedAt`. Covered by calendar-date validation and inclusive-range e2e tests.
 
 ## Context
 
