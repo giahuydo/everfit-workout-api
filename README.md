@@ -19,13 +19,13 @@ Prerequisites: Node.js 22, pnpm 10.28.2 (pinned in `package.json` and the Docker
 DB_PASSWORD=choose-a-local-password docker compose up --build
 ```
 
-Compose starts `postgres`, runs the one-shot `migrate` service (versioned migrations), and only then starts `app`. The API listens on `http://localhost:3000` (or `PORT` from the environment/`.env`, e.g. 3100 after `cp .env.example .env`); PostgreSQL is published on `localhost:55432`.
+Compose starts `postgres`, runs the one-shot `migrate` service (versioned migrations), and only then starts `app`. The API listens on `http://localhost:3000` (or `PORT` from the environment/`.env`, e.g. 3100 after `cp .env.example .env`); PostgreSQL is bound to `127.0.0.1:${DB_PORT:-55432}`; set `DB_PORT` if that host port is already in use.
 
 ### Option B: API on the host, PostgreSQL in Docker
 
 ```sh
 cp .env.example .env              # DB on 127.0.0.1:55432, API on port 3100, DB_PASSWORD=everfit
-docker compose up -d postgres     # start only PostgreSQL; Compose reads DB_PASSWORD from .env
+docker compose up -d postgres     # start only PostgreSQL; Compose reads DB_PASSWORD/DB_PORT from .env
 pnpm install
 pnpm migration:run                # apply versioned migrations
 pnpm start:dev                    # http://localhost:3100
