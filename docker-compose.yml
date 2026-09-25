@@ -1,0 +1,18 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: everfit
+      POSTGRES_PASSWORD: everfit
+      POSTGRES_DB: everfit
+    ports:
+      - "55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U everfit -d everfit"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - everfit_pg:/var/lib/postgresql/data
+volumes:
+  everfit_pg:
