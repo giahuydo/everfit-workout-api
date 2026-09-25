@@ -13,7 +13,9 @@ async function bootstrap() {
     whitelist: true,
     forbidNonWhitelisted: true,
     transform: true,
-    transformOptions: { enableImplicitConversion: true },
+    // Body values must retain their JSON types. Query DTOs opt into the few
+    // conversions they need explicitly (for example, `limit`).
+    transformOptions: { enableImplicitConversion: false },
   }));
 
   const config = new DocumentBuilder()

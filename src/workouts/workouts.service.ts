@@ -121,7 +121,7 @@ export class WorkoutsService {
 
       return {
         entries: entries.map((entry) =>
-          this.entryResponse(entry, entry.sets, 'kg', false),
+          this.logEntryResponse(entry, entry.sets),
         ),
       };
     });
@@ -165,7 +165,7 @@ export class WorkoutsService {
       );
     }
 
-    const { entities: rows, raw } = await qb
+    const { entities, raw } = await qb
       .orderBy('entry.workout_date', 'DESC')
       .addOrderBy('entry.created_at', 'DESC')
       .addOrderBy('entry.id', 'DESC')
@@ -177,6 +177,12 @@ export class WorkoutsService {
       )
       .take(limit + 1)
       .getRawAndEntities();
+
+    const rows = entities.map((entry, index) =>
+      Object.assign(entry, {
+        cursorCreatedAt: raw[index]?.cursor_created_at as string,
+      }),
+    ) as HistoryRow[];
 
     const hasMore = rows.length > limit;
     const page = rows.slice(0, limit);
@@ -195,35 +201,44 @@ export class WorkoutsService {
     }
 
     const last = page.at(-1);
-    const cursorCreatedAtById = new Map(
-      raw.map((row) => [
-        row.entry_id as string,
-        row.cursor_created_at as string,
-      ]),
-    );
     const nextCursor =
       hasMore && last
         ? this.encodeCursor({
             v: 1,
             date: last.workoutDate,
-            createdAt: cursorCreatedAtById.get(last.id) ?? '',
+            createdAt: last.cursorCreatedAt,
             id: last.id,
             scope,
           })
         : null;
 
-    return {
+    const response = {
       items: page.map((entry) =>
         this.entryResponse(entry, setsByEntry.get(entry.id) ?? [], unit, true),
       ),
-      pageInfo: { nextCursor },
-      message:
-        page.length === 0 ? 'No workouts found for the requested range.' : null,
+      page: { limit, hasMore, nextCursor },
+    };
+    return page.length === 0
+      ? { ...response, message: 'No workouts found for the requested filters' }
+      : response;
+  }
+
+  private logEntryResponse(entry: WorkoutEntry, sets: WorkoutSet[]) {
+    return {
+      id: entry.id,
+      exerciseName: entry.exercise?.name,
+      date: entry.workoutDate,
+      sets: [...sets].sort((a, b) => a.setOrder - b.setOrder).map((set) => ({
+        id: set.id,
+        reps: set.reps,
+        weight: Number(set.originalWeight),
+        unit: set.originalUnit,
+      })),
     };
   }
 
   private entryResponse(
-    entry: WorkoutEntry,
+    entry: HistoryRow,
     sets: WorkoutSet[],
     unit: WeightUnit,
     convert: boolean,
@@ -233,11 +248,11 @@ export class WorkoutsService {
       exerciseName: entry.exercise?.name,
       muscleGroup: entry.exercise?.muscleGroup ?? null,
       date: entry.workoutDate,
+      createdAt: entry.cursorCreatedAt,
       sets: [...sets]
         .sort((a, b) => a.setOrder - b.setOrder)
         .map((set) => ({
           id: set.id,
-          position: set.setOrder,
           reps: set.reps,
           weight: convert
             ? this.units.fromKg(set.weightKg, unit)
@@ -278,25 +293,44 @@ export class WorkoutsService {
 
   private decodeCursor(raw: string, expectedScope: string): CursorPayload {
     try {
+      if (!/^[A-Za-z0-9_-]+$/.test(raw)) throw new Error('invalid encoding');
       const parsed = JSON.parse(
         Buffer.from(raw, 'base64url').toString('utf8'),
       ) as CursorPayload;
       if (
         parsed.v !== 1 ||
-        !parsed.date ||
-        !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/.test(
-          parsed.createdAt,
-        ) ||
-        !parsed.id ||
+        typeof parsed.date !== 'string' ||
+        typeof parsed.createdAt !== 'string' ||
+        typeof parsed.id !== 'string' ||
         parsed.scope !== expectedScope
       )
         throw new Error('invalid');
       assertCalendarDate(parsed.date, 'cursor.date');
-      if (Number.isNaN(Date.parse(parsed.createdAt)))
-        throw new Error('invalid timestamp');
+      if (
+        !this.isUtcMicrosecondTimestamp(parsed.createdAt) ||
+        !this.isUuid(parsed.id)
+      )
+        throw new Error('invalid cursor key');
       return parsed;
     } catch {
       throw new BadRequestException('Invalid cursor for the current query');
     }
+  }
+
+  private isUtcMicrosecondTimestamp(value: string): boolean {
+    const match =
+      /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2}):(\d{2})\.(\d{6})Z$/.exec(
+        value,
+      );
+    if (!match) return false;
+    assertCalendarDate(match[1], 'cursor.createdAt');
+    const [, , hour, minute, second] = match;
+    return Number(hour) <= 23 && Number(minute) <= 59 && Number(second) <= 59;
+  }
+
+  private isUuid(value: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value,
+    );
   }
 }

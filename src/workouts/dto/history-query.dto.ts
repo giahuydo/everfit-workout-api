@@ -3,7 +3,7 @@ import { IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 
 import type { WeightUnit } from '../../units/units.service.js';
 
 export class HistoryQueryDto {
-  @IsOptional() @IsString() @MaxLength(120)
+  @IsOptional() @IsString() @Matches(/\S/) @MaxLength(120)
   exerciseName?: string;
 
   @IsOptional() @IsString() @MaxLength(80)

@@ -2,7 +2,7 @@ import { IsIn, IsOptional, IsString, Matches, MaxLength } from 'class-validator'
 import type { WeightUnit } from '../../units/units.service.js';
 
 export class PrQueryDto {
-  @IsString() @MaxLength(120)
+  @IsString() @Matches(/\S/) @MaxLength(120)
   exerciseName!: string;
 
   @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/)
@@ -16,7 +16,7 @@ export class PrQueryDto {
 }
 
 export class ComparePrQueryDto {
-  @IsString() @MaxLength(120)
+  @IsString() @Matches(/\S/) @MaxLength(120)
   exerciseName!: string;
 
   @Matches(/^\d{4}-\d{2}-\d{2}$/)

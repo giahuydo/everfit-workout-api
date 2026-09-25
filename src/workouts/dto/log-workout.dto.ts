@@ -32,6 +32,7 @@ export class WorkoutSetInputDto {
 
 export class ExerciseLogInputDto {
   @IsString()
+  @Matches(/\S/)
   @MaxLength(120)
   exerciseName!: string;
 

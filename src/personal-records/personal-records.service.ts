@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { Decimal } from 'decimal.js';
 import { assertRange } from '../common/date.js';
@@ -6,7 +6,7 @@ import { normalizeExerciseName } from '../common/exercise-name.js';
 import { UnitsService, type WeightUnit } from '../units/units.service.js';
 import { ComparePrQueryDto, PrQueryDto } from '../workouts/dto/pr-query.dto.js';
 
-type Metric = 'heaviest' | 'highestVolume' | 'estimated1RM';
+type Metric = 'heaviestSet' | 'highestVolume' | 'estimatedOneRepMax';
 
 interface WinnerRow {
   set_id: string;
@@ -24,13 +24,16 @@ export class PersonalRecordsService {
   constructor(private readonly dataSource: DataSource, private readonly units: UnitsService) {}
 
   async get(userId: string, query: PrQueryDto) {
+    this.assertUserId(userId);
     assertRange(query.from, query.to);
     const unit = query.unit ?? 'kg';
     this.units.assertUnit(unit);
-    return this.compute(userId, query.exerciseName, query.from, query.to, unit);
+    const result = await this.compute(userId, query.exerciseName, query.from, query.to, unit);
+    return result.message ? { ...result.records, message: result.message } : result.records;
   }
 
   async compare(userId: string, query: ComparePrQueryDto) {
+    this.assertUserId(userId);
     assertRange(query.rangeAFrom, query.rangeATo);
     assertRange(query.rangeBFrom, query.rangeBTo);
     const unit = query.unit ?? 'kg';
@@ -40,22 +43,13 @@ export class PersonalRecordsService {
       this.compute(userId, query.exerciseName, query.rangeBFrom, query.rangeBTo, unit),
     ]);
 
-    const delta = (metric: Metric) => {
-      const left = a.records[metric]?.value;
-      const right = b.records[metric]?.value;
-      return left == null || right == null ? null : new Decimal(left).minus(right).toDecimalPlaces(3, Decimal.ROUND_HALF_UP).toNumber();
-    };
-
     return {
-      exerciseName: query.exerciseName.trim(),
-      unit,
-      rangeA: { from: query.rangeAFrom, to: query.rangeATo, records: a.records },
-      rangeB: { from: query.rangeBFrom, to: query.rangeBTo, records: b.records },
-      deltaAminusB: {
-        heaviest: delta('heaviest'),
-        highestVolume: delta('highestVolume'),
-        estimated1RM: delta('estimated1RM'),
-      },
+      rangeA: a.message
+        ? { from: query.rangeAFrom, to: query.rangeATo, records: a.records, message: 'No personal records found for this range' }
+        : { from: query.rangeAFrom, to: query.rangeATo, records: a.records },
+      rangeB: b.message
+        ? { from: query.rangeBFrom, to: query.rangeBTo, records: b.records, message: 'No personal records found for this range' }
+        : { from: query.rangeBFrom, to: query.rangeBTo, records: b.records },
     };
   }
 
@@ -70,9 +64,9 @@ export class PersonalRecordsService {
     const tie = `we.workout_date ASC, we.created_at ASC, we.id ASC, ws.set_order ASC`;
 
     const specs: Record<Metric, { expr: string; order: string }> = {
-      heaviest: { expr: 'ws.weight_kg', order: `ws.weight_kg DESC, ${tie}` },
+      heaviestSet: { expr: 'ws.weight_kg', order: `ws.weight_kg DESC, ${tie}` },
       highestVolume: { expr: '(ws.reps::numeric * ws.weight_kg)', order: `(ws.reps::numeric * ws.weight_kg) DESC, ${tie}` },
-      estimated1RM: { expr: `(ws.weight_kg * (1::numeric + ws.reps::numeric / 30::numeric))`, order: `(ws.weight_kg * (1::numeric + ws.reps::numeric / 30::numeric)) DESC, ${tie}` },
+      estimatedOneRepMax: { expr: `(ws.weight_kg * (1::numeric + ws.reps::numeric / 30::numeric))`, order: `(ws.weight_kg * (1::numeric + ws.reps::numeric / 30::numeric)) DESC, ${tie}` },
     };
 
     const entries = await Promise.all((Object.keys(specs) as Metric[]).map(async (metric) => {
@@ -87,11 +81,8 @@ export class PersonalRecordsService {
     const records = Object.fromEntries(entries) as Record<Metric, ReturnType<PersonalRecordsService['mapWinner']> | null>;
     const empty = Object.values(records).every((value) => value === null);
     return {
-      exerciseName: exerciseName.trim(),
-      unit,
-      range: { from: from ?? null, to: to ?? null },
       records,
-      message: empty ? 'No workout data found for the requested range.' : null,
+      message: empty ? 'No personal records found for the requested range' : null,
     };
   }
 
@@ -101,10 +92,18 @@ export class PersonalRecordsService {
       ? new Decimal(this.units.fromKg(row.weight_kg, unit, 6)).times(row.reps).toDecimalPlaces(3, Decimal.ROUND_HALF_UP).toNumber()
       : this.units.fromKg(row.metric_value, unit);
     return {
+      entryId: row.entry_id,
+      setId: row.set_id,
+      reps: row.reps,
+      weight,
+      unit,
       value,
-      unit: metric === 'highestVolume' ? `${unit}·reps` : unit,
-      date: row.workout_date,
-      set: { id: row.set_id, reps: row.reps, weight, unit },
+      valueUnit: metric === 'highestVolume' ? `${unit}·reps` : unit,
+      achievedDate: row.workout_date,
     };
+  }
+
+  private assertUserId(userId: string) {
+    if (!userId?.trim() || userId.length > 128) throw new BadRequestException('userId must be 1-128 characters');
   }
 }
