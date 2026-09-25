@@ -61,7 +61,7 @@ export class PersonalRecordsService {
     if (to) { baseParams.push(to); conditions.push(`we.workout_date <= $${baseParams.length}`); }
     const where = conditions.join(' AND ');
     const shared = `FROM workout_sets ws JOIN workout_entries we ON we.id = ws.workout_entry_id JOIN exercises e ON e.id = we.exercise_id WHERE ${where}`;
-    const tie = `we.workout_date ASC, we.created_at ASC, we.id ASC, ws.set_order ASC`;
+    const tie = `we.workout_date ASC, we.created_at ASC, we.id ASC, ws.set_order ASC, ws.id ASC`;
 
     const specs: Record<Metric, { expr: string; order: string }> = {
       heaviestSet: { expr: 'ws.weight_kg', order: `ws.weight_kg DESC, ${tie}` },

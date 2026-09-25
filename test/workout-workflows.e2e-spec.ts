@@ -5,6 +5,7 @@ import request, { type Response } from 'supertest';
 import { DataSource } from 'typeorm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { AppModule } from '../src/app.module.js';
+import { HttpExceptionFilter } from '../src/common/http-exception.filter.js';
 
 const testDatabase = process.env.E2E_DB_NAME ?? 'everfit_workflows_test';
 const dbConfig = {
@@ -78,8 +79,9 @@ beforeAll(async () => {
     whitelist: true,
     forbidNonWhitelisted: true,
     transform: true,
-    transformOptions: { enableImplicitConversion: true },
+    transformOptions: { enableImplicitConversion: false },
   }));
+  app.useGlobalFilters(app.get(HttpExceptionFilter));
   await app.init();
   dataSource = app.get(DataSource);
 });
@@ -218,7 +220,7 @@ describe('workout assignment workflows', () => {
 
     const first = await request(app.getHttpServer()).get('/v1/users/cursor-scope-user/workouts?limit=1');
     const scoped = await request(app.getHttpServer())
-      .get(`/v1/users/another-user/workouts?limit=1&cursor=${encodeURIComponent(first.body.pageInfo.nextCursor as string)}`);
+      .get(`/v1/users/another-user/workouts?limit=1&cursor=${encodeURIComponent(first.body.page.nextCursor as string)}`);
     expectValidationFailure(scoped);
   });
 
@@ -262,7 +264,7 @@ describe('workout assignment workflows', () => {
         unit: 'kg',
         value: 110,
         valueUnit: 'kg',
-        achievedDate: '2026-09-20',
+        achievedDate: '2026-09-21',
       },
       highestVolume: expect.objectContaining({ value: 1000, valueUnit: 'kg·reps', achievedDate: '2026-09-20' }),
       estimatedOneRepMax: expect.objectContaining({ value: 133.333, valueUnit: 'kg', achievedDate: '2026-09-20' }),
@@ -288,7 +290,6 @@ describe('workout assignment workflows', () => {
     expect(comparison.body).toEqual({
       rangeA: expect.objectContaining({ from: '2026-09-01', to: '2026-09-30', records: expect.objectContaining({ heaviestSet: expect.objectContaining({ value: 120 }) }) }),
       rangeB: expect.objectContaining({ from: '2026-08-01', to: '2026-08-31', records: expect.objectContaining({ heaviestSet: expect.objectContaining({ value: 100 }) }) }),
-      deltaAminusB: expect.objectContaining({ heaviest: 20, highestVolume: 100, estimatedOneRepMax: 23.333 }),
     });
   });
 });

@@ -40,6 +40,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
   private codeFor(exception: unknown, statusCode: number): string {
     if (typeof exception === 'object' && exception !== null && 'type' in exception && exception.type === 'entity.too.large') return 'PAYLOAD_TOO_LARGE';
     if (statusCode === HttpStatus.INTERNAL_SERVER_ERROR) return 'INTERNAL_SERVER_ERROR';
+    if (statusCode === HttpStatus.BAD_REQUEST) return 'VALIDATION_ERROR';
     return `HTTP_${statusCode}`;
   }
 
