@@ -5,8 +5,6 @@ import request, { type Response } from 'supertest';
 import { DataSource } from 'typeorm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { assertDisposableTestDatabase } from './database-test-guard.js';
-import { AppModule } from '../src/app.module.js';
-import { HttpExceptionFilter } from '../src/common/http-exception.filter.js';
 
 const testDatabase = process.env.E2E_DB_NAME ?? 'everfit_workflows_test';
 const configuredApplicationDatabase = process.env.DB_NAME;
@@ -75,6 +73,10 @@ beforeAll(async () => {
 
   process.env.DB_NAME = testDatabase;
   process.env.DB_SYNCHRONIZE = 'true';
+  // AppModule validates/reads DB_* during module loading, so import it only
+  // after the isolated test database environment is established.
+  const { AppModule } = await import('../src/app.module.js');
+  const { HttpExceptionFilter } = await import('../src/common/http-exception.filter.js');
   const module = await Test.createTestingModule({ imports: [AppModule] }).compile();
   app = module.createNestApplication();
   app.useGlobalPipes(new ValidationPipe({
