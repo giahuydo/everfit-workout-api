@@ -4,10 +4,12 @@ import { Client } from 'pg';
 import request from 'supertest';
 import type { DataSource } from 'typeorm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { assertDisposableTestDatabase } from './database-test-guard.js';
 
 // Verifies the production schema path: a fresh database built only by the
 // versioned initial migration, with the app booted under DB_SYNCHRONIZE=false.
 const testDatabase = process.env.E2E_MIGRATIONS_DB_NAME ?? 'everfit_migrations_test';
+const configuredApplicationDatabase = process.env.DB_NAME;
 const dbConfig = {
   host: process.env.DB_HOST ?? '127.0.0.1',
   port: Number(process.env.DB_PORT ?? '55432'),
@@ -20,7 +22,7 @@ let migrationSource: DataSource;
 let appliedMigrations: string[];
 
 beforeAll(async () => {
-  if (!/^[a-z_][a-z0-9_]*$/.test(testDatabase)) throw new Error('E2E_MIGRATIONS_DB_NAME must be a simple PostgreSQL identifier');
+  assertDisposableTestDatabase(testDatabase, configuredApplicationDatabase, 'E2E_MIGRATIONS_DB_NAME');
   const admin = new Client({ ...dbConfig, database: 'postgres' });
   await admin.connect();
   try {

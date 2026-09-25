@@ -29,6 +29,11 @@ export function validateEnvironment(env: NodeJS.ProcessEnv): Environment {
     throw new Error('DB_PASSWORD must be explicitly set to a non-default value in production');
   }
 
+  const dbSynchronize = boolean(env.DB_SYNCHRONIZE, 'DB_SYNCHRONIZE', false);
+  if (nodeEnv === 'production' && dbSynchronize) {
+    throw new Error('DB_SYNCHRONIZE must be false in production');
+  }
+
   const catalogPath = env.EXERCISE_CATALOG_PATH;
   if (catalogPath !== undefined && !catalogPath.trim()) {
     throw new Error('EXERCISE_CATALOG_PATH must be a non-blank file path when set');
@@ -45,7 +50,7 @@ export function validateEnvironment(env: NodeJS.ProcessEnv): Environment {
     DB_NAME: env.DB_NAME ?? 'everfit',
     // Migrations own schema changes in every environment. Synchronize remains
     // an explicit escape hatch for disposable local databases only.
-    DB_SYNCHRONIZE: boolean(env.DB_SYNCHRONIZE, 'DB_SYNCHRONIZE', false),
+    DB_SYNCHRONIZE: dbSynchronize,
     DB_POOL_MAX: integer(env.DB_POOL_MAX, 'DB_POOL_MAX', 10, { min: 1, max: 100 }),
     DB_CONNECTION_TIMEOUT_MS: integer(env.DB_CONNECTION_TIMEOUT_MS, 'DB_CONNECTION_TIMEOUT_MS', 5_000, { min: 100, max: 120_000 }),
     DB_IDLE_TIMEOUT_MS: integer(env.DB_IDLE_TIMEOUT_MS, 'DB_IDLE_TIMEOUT_MS', 30_000, { min: 1_000, max: 600_000 }),

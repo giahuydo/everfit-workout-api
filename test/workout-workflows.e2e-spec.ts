@@ -4,10 +4,12 @@ import { Client } from 'pg';
 import request, { type Response } from 'supertest';
 import { DataSource } from 'typeorm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { assertDisposableTestDatabase } from './database-test-guard.js';
 import { AppModule } from '../src/app.module.js';
 import { HttpExceptionFilter } from '../src/common/http-exception.filter.js';
 
 const testDatabase = process.env.E2E_DB_NAME ?? 'everfit_workflows_test';
+const configuredApplicationDatabase = process.env.DB_NAME;
 const dbConfig = {
   host: process.env.DB_HOST ?? '127.0.0.1',
   port: Number(process.env.DB_PORT ?? '55432'),
@@ -61,7 +63,7 @@ function expectValidationFailure(response: Response) {
 }
 
 beforeAll(async () => {
-  if (!/^[a-z_][a-z0-9_]*$/.test(testDatabase)) throw new Error('E2E_DB_NAME must be a simple PostgreSQL identifier');
+  assertDisposableTestDatabase(testDatabase, configuredApplicationDatabase, 'E2E_DB_NAME');
   const admin = new Client({ ...dbConfig, database: 'postgres' });
   await admin.connect();
   try {

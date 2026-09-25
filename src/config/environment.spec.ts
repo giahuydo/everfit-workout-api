@@ -9,9 +9,14 @@ describe('validateEnvironment', () => {
     expect(config.DB_STATEMENT_TIMEOUT_MS).toBe(15_000);
   });
 
-  it('rejects invalid ports and unsafe production database credentials', () => {
+  it('rejects invalid ports and unsafe production database configuration', () => {
     expect(() => validateEnvironment({ PORT: 'invalid' })).toThrow('PORT');
     expect(() => validateEnvironment({ NODE_ENV: 'production' })).toThrow('DB_PASSWORD');
+    expect(() => validateEnvironment({
+      NODE_ENV: 'production',
+      DB_PASSWORD: 'non-default-secret',
+      DB_SYNCHRONIZE: 'true',
+    })).toThrow('DB_SYNCHRONIZE must be false in production');
   });
 
   it('resolves an optional exercise catalog path override', () => {
