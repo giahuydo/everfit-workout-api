@@ -1,4 +1,4 @@
-import { BadRequestException, type ArgumentsHost } from '@nestjs/common';
+import { BadRequestException, HttpException, HttpStatus, type ArgumentsHost } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import { HttpExceptionFilter } from './http-exception.filter.js';
 
@@ -43,8 +43,48 @@ describe('HttpExceptionFilter', () => {
       statusCode: 413,
       code: 'PAYLOAD_TOO_LARGE',
       message: 'Request failed',
-      details: null,
+      details: [],
       requestId: 'request-123',
     });
+  });
+
+  it('preserves explicit array details for non-5xx responses', () => {
+    const json = vi.fn();
+    const status = vi.fn(() => ({ json }));
+    const logger = { error: vi.fn(), warn: vi.fn() };
+    const host = {
+      switchToHttp: () => ({
+        getRequest: () => ({ id: 'request-123' }),
+        getResponse: () => ({ status }),
+      }),
+    } as ArgumentsHost;
+
+    new HttpExceptionFilter(logger as never).catch(
+      new HttpException({ message: 'Cursor is malformed', details: ['cursor must be a UUID'] }, HttpStatus.BAD_REQUEST),
+      host,
+    );
+
+    expect(json).toHaveBeenCalledWith(expect.objectContaining({
+      details: ['cursor must be a UUID'],
+    }));
+  });
+
+  it('keeps details null for 5xx responses', () => {
+    const json = vi.fn();
+    const status = vi.fn(() => ({ json }));
+    const logger = { error: vi.fn(), warn: vi.fn() };
+    const host = {
+      switchToHttp: () => ({
+        getRequest: () => ({ id: 'request-123' }),
+        getResponse: () => ({ status }),
+      }),
+    } as ArgumentsHost;
+
+    new HttpExceptionFilter(logger as never).catch(new Error('private error'), host);
+
+    expect(json).toHaveBeenCalledWith(expect.objectContaining({
+      statusCode: 500,
+      details: null,
+    }));
   });
 });

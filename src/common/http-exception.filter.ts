@@ -5,7 +5,7 @@ import { Logger } from 'nestjs-pino';
 interface ErrorResponse {
   message?: string | string[];
   error?: string;
-  details?: object;
+  details?: unknown;
 }
 
 @Catch()
@@ -56,9 +56,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
     return statusCode >= 500 ? 'Internal server error' : 'Request failed';
   }
 
-  private detailsFor(error: ErrorResponse, statusCode: number): object | null {
+  private detailsFor(error: ErrorResponse, statusCode: number): unknown[] | null {
     if (statusCode >= 500) return null;
     if (Array.isArray(error.message)) return error.message;
-    return error.details ?? null;
+    if (Array.isArray(error.details)) return error.details;
+    return [];
   }
 }
