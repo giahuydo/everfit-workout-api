@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { PersonalRecordsController } from '../personal-records/personal-records.controller.js';
+import { PersonalRecordsService } from '../personal-records/personal-records.service.js';
 import { Exercise } from './entities/exercise.entity.js';
 import { WorkoutEntry } from './entities/workout-entry.entity.js';
 import { WorkoutSet } from './entities/workout-set.entity.js';
@@ -9,7 +11,7 @@ import { WorkoutsService } from './workouts.service.js';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Exercise, WorkoutEntry, WorkoutSet])],
-  controllers: [WorkoutsController],
-  providers: [WorkoutsService, ExerciseSeedService],
+  controllers: [WorkoutsController, PersonalRecordsController],
+  providers: [WorkoutsService, PersonalRecordsService, ExerciseSeedService],
 })
 export class WorkoutsModule {}
