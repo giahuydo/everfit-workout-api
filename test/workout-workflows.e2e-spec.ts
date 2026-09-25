@@ -65,8 +65,8 @@ beforeAll(async () => {
   const admin = new Client({ ...dbConfig, database: 'postgres' });
   await admin.connect();
   try {
-    const exists = await admin.query('SELECT 1 FROM pg_database WHERE datname = $1', [testDatabase]);
-    if (exists.rowCount === 0) await admin.query(`CREATE DATABASE ${testDatabase}`);
+    await admin.query(`DROP DATABASE IF EXISTS ${testDatabase} WITH (FORCE)`);
+    await admin.query(`CREATE DATABASE ${testDatabase}`);
   } finally {
     await admin.end();
   }
