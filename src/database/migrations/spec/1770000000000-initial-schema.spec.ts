@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { QueryRunner } from 'typeorm';
-import { InitialSchema1770000000000 } from './1770000000000-initial-schema.js';
+import { InitialSchema1770000000000 } from '../1770000000000-initial-schema.js';
 
 describe('InitialSchema1770000000000', () => {
   it('creates UUID-generating primary keys for application inserts and reverses dependent tables first', async () => {

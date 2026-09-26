@@ -5,7 +5,7 @@ import { validate } from 'class-validator';
 import { describe, expect, it } from 'vitest';
 import { HistoryQueryDto } from '../src/workouts/dto/history-query.dto.js';
 import { LogWorkoutDto } from '../src/workouts/dto/log-workout.dto.js';
-import { ComparePrQueryDto, PrQueryDto } from '../src/workouts/dto/pr-query.dto.js';
+import { ComparePrQueryDto, PrQueryDto } from '../src/personal-records/dto/pr-query.dto.js';
 import { PersonalRecordsService } from '../src/personal-records/personal-records.service.js';
 import { assertCalendarDate } from '../src/common/date.js';
 import { UnitsService, WEIGHT_UNITS } from '../src/units/units.service.js';

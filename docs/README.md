@@ -39,4 +39,4 @@ docs/architecture.md       — how the system is shaped and how requests flow
 
 ## Source-of-truth rule
 
-The running code and versioned migration are authoritative for implemented behavior. The root README is the reviewer-facing summary; these docs explain the design in more depth; `notes/` preserves evidence and history.
+The running code and versioned migration are authoritative for implemented behavior. The root README is the reviewer-facing summary; these docs explain the design in more depth; `notes/` preserves evidence and history. Unit specs live in module-local `src/**/spec/` directories; contract and DB-backed E2E specs live under `test/`. The 50k numbers are from one recorded SQL plan run, not a concurrency benchmark.

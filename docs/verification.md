@@ -4,13 +4,9 @@ This document keeps implementation evidence out of the root README while preserv
 
 ## Automated verification
 
-Verified on this branch on 2026-09-26:
+Current uncommitted workspace (2026-09-26): `pnpm build` and `pnpm lint` passed; `pnpm test` passed **39/39 tests in 8 files**. Source unit specs live under feature-local `src/**/spec/` directories; DB-backed E2E specs remain in `test/`. The three PR service cases cover distinct per-metric winner mapping, independent comparison ranges, and rejecting invalid inputs before queries. Mocked winners do not prove PostgreSQL's SQL winner selection.
 
-- `pnpm build` passed;
-- `pnpm lint` reported 0 warnings and 0 errors;
-- `pnpm test` passed 36/36 tests in 7 files;
-- `pnpm test:e2e` passed 23/23 tests in 2 PostgreSQL-backed files;
-- `pnpm test:e2e:migrations` passed 2/2.
+Earlier recorded run on 2026-09-26 (before the module-local spec/DTO refactors): `pnpm test:e2e` passed **23/23 in 2 PostgreSQL-backed files** and `pnpm test:e2e:migrations` passed **2/2**. These DB-backed results are **historical**, not a claim that E2E was rerun after the current uncommitted changes.
 
 A clean Compose build also passed after pinning pnpm 10.28.2. The one-shot migration service exited successfully, `/health/live` and `/health/ready` returned `200`, and a workout POST smoke request returned `201`.
 
@@ -28,7 +24,7 @@ Migration-backed E2E starts from a fresh database with `DB_SYNCHRONIZE=false`, r
 
 ## 50k query-plan evidence
 
-The deterministic harness uses one user with 50,000 workout entries and 174,823 sets across seven exercises, covering dates from 2022-09-27 through 2026-09-25.
+The recorded (earlier) deterministic harness run used one user with 50,000 workout entries and 174,823 sets across seven exercises, covering dates from 2022-09-27 through 2026-09-25.
 
 Recorded `EXPLAIN (ANALYZE, BUFFERS)` execution times from the local evidence run:
 

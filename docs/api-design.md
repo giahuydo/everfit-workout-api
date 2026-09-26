@@ -3,6 +3,7 @@
 - **Base path:** `/v1`
 - **Identity:** `:userId` is a required opaque client identifier, not authentication.
 - **Dates:** real `YYYY-MM-DD` calendar dates with inclusive bounds. Valid no-data requests return `200`, not an error.
+- **Interactive contract:** Swagger UI at `/docs`; Scalar at `/reference`. Both use the generated OpenAPI document: six labeled POST presets (including invalid 400 cases), GET query parameters, and success/no-data/error examples. No GET request bodies.
 
 ## Endpoints at a glance
 
@@ -208,6 +209,8 @@ All errors use one envelope:
 | `500` | `INTERNAL_SERVER_ERROR` | unexpected server/database failure |
 
 Unexpected failures return `details: null` and never expose stack traces in the response. A database failure never becomes a partial-success bulk response.
+
+The PR query contracts are defined in `src/personal-records/dto/pr-query.dto.ts`; documentation-only PR response schemas/examples live in `src/personal-records/personal-records.openapi-examples.ts`. Shared error-envelope helpers live in `src/common/openapi-responses.ts`.
 
 ## Related docs
 

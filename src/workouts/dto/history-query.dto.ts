@@ -1,26 +1,68 @@
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Matches,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 import { WEIGHT_UNITS, type WeightUnit } from '../../units/units.service.js';
 
 export class HistoryQueryDto {
-  @IsOptional() @IsString() @Matches(/\S/) @MaxLength(120)
+  @ApiPropertyOptional({
+    example: 'Bench Press',
+    description: 'Literal partial exercise-name match',
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(/\S/)
+  @MaxLength(120)
   exerciseName?: string;
 
-  @IsOptional() @IsString() @MaxLength(80)
+  @ApiPropertyOptional({ example: 'chest' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
   muscleGroup?: string;
 
-  @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  @ApiPropertyOptional({ example: '2026-08-01', format: 'date' })
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
   from?: string;
 
-  @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  @ApiPropertyOptional({ example: '2026-09-30', format: 'date' })
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
   to?: string;
 
-  @IsOptional() @IsIn(WEIGHT_UNITS)
+  @ApiPropertyOptional({ enum: WEIGHT_UNITS, default: 'kg', example: 'kg' })
+  @IsOptional()
+  @IsIn(WEIGHT_UNITS)
   unit: WeightUnit = 'kg';
 
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100)
+  @ApiPropertyOptional({
+    type: Number,
+    default: 20,
+    example: 20,
+    minimum: 1,
+    maximum: 100,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
   limit = 20;
 
-  @IsOptional() @IsString() @MaxLength(2048)
+  @ApiPropertyOptional({
+    description: 'Opaque cursor returned by the previous page',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
   cursor?: string;
 }

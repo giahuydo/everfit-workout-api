@@ -57,13 +57,15 @@ This is why the service has a small write path and richer read/query behavior ra
 | Area | Responsibility |
 | --- | --- |
 | `workouts` | Atomic bulk logging, history filters, keyset pagination, exercise resolution |
-| `personal-records` | Heaviest-set, highest-volume, Epley 1RM, and range comparison queries |
+| `personal-records` | Query DTOs, read-only heaviest-set/volume/Epley 1RM calculations, and range comparison |
 | `units` | Central kg/lb registry, canonical conversion, response formatting |
 | exercise catalog | Shared exercise identity plus configurable muscle-group metadata |
 | `common` / `config` | Date/name helpers, validation, errors, request IDs, runtime configuration |
 | database migration | Tables, constraints, indexes, UUID defaults; schema source of truth |
 
-Controllers stay thin. Services own use cases. Unit conversion is centralized rather than repeated in endpoint code.
+`AppModule` imports `WorkoutsModule`, which registers both the workout and personal-records controllers/services. This is one Nest module with two feature directories, not a separate `PersonalRecordsModule`. Workout entities and persistence remain under `workouts/entities/`; PRs are a computed read model over those tables, with no PR entity, table, or stored aggregate. The PR endpoint DTOs live under `personal-records/dto/`.
+
+OpenAPI error-envelope helpers shared by both features live in `common/openapi-responses.ts`; feature-specific success schemas and examples live in each feature's `*.openapi-examples.ts`, with decorators in `*.openapi.ts`. Swagger UI is served at `/docs` and Scalar at `/reference`. Controllers stay thin; services own use cases. Unit conversion is centralized rather than repeated in endpoint code.
 
 ## Write flow
 
@@ -129,7 +131,7 @@ This keeps the model faithful to the assignment while still providing determinis
 
 ## Scaling stance
 
-The implemented target is correct behavior and query plans for **50k+ workout entries per user**. Recorded evidence is query-plan evidence, not a claim of 10k concurrent-user capacity.
+The design targets histories of 50k+ entries per user. One recorded 50k-entry run provides limited SQL query-plan evidence (on an earlier query shape), not a current HTTP benchmark or a claim of 10k concurrent-user capacity.
 
 If measured load later requires more capacity, the next steps would be evidence-driven: stateless API replicas, explicit connection-pool control/PgBouncer, query/index improvements, read replicas or cached/projection reads for hot PR workloads, and only then more complex infrastructure.
 

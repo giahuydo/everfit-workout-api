@@ -63,6 +63,8 @@ erDiagram
 - `weight_kg NUMERIC(15,6)` is the canonical calculation value.
 - Deleting an entry cascades to its sets.
 
+Personal records have **no table or TypeORM entity**: each request ranks persisted workout sets joined to their entries and exercise identity. Range comparison runs the same read model independently for each range.
+
 ## Why store original and canonical weight?
 
 ```text

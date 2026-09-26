@@ -100,16 +100,15 @@ These are process findings, not fabricated AI-error stories; no retained record 
 
 ## Current verification
 
-Verified on 2026-09-26 on the integrated branch:
+Current uncommitted workspace: `pnpm build` and `pnpm lint` passed; `pnpm test` passed **39/39 in 8 files**. The later module-local spec and OpenAPI refactors have not had a fresh DB-backed E2E/Compose run.
 
-- `pnpm build` — passed;
-- `pnpm lint` — 0 warnings / 0 errors;
-- `pnpm test` — 36/36 in 7 files;
+Earlier verification recorded on 2026-09-26:
+
 - `pnpm test:e2e` — 23/23 in 2 DB-backed files;
 - `pnpm test:e2e:migrations` — 2/2;
 - clean Docker/Compose startup — migration completed before app startup; live/ready healthy; POST workout smoke returned 201.
 
-The 50k timings come from one earlier local query-plan run and are intentionally described with limitations in [`notes/experiments.md`](notes/experiments.md).
+See [`docs/verification.md`](docs/verification.md) for the current/local versus historical DB verification boundary. The 50k timings come from one earlier local query-plan run and are intentionally described with limitations in [`notes/experiments.md`](notes/experiments.md).
 
 ## Supporting evidence
 

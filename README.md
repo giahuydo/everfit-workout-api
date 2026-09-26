@@ -91,6 +91,8 @@ erDiagram
 - **`workout_entries`** represents one exercise occurrence for one user on one workout date; repeated same-day entries are valid.
 - **`workout_sets`** preserves submitted set order and original weight/unit while also storing decimal-safe canonical kilograms.
 
+Personal records are computed from these tables at read time; there is no separate PR entity or table.
+
 See [`docs/database-design.md`](docs/database-design.md) for schema constraints, indexes, query shapes, and concurrency details.
 
 ## Key engineering decisions
@@ -158,11 +160,9 @@ The API uses structured validation errors, treats valid no-data reads as `200`, 
 
 ## Verification at a glance
 
-The implementation is verified with build/lint gates, unit tests, PostgreSQL-backed E2E tests, migration-backed startup tests, and a deterministic 50k-entry query-plan harness. The latest recorded verification on this branch passed `pnpm build`, `pnpm lint`, 36/36 unit tests, 23/23 DB-backed E2E tests, and 2/2 migration E2E tests.
+The current workspace passes `pnpm build`, `pnpm lint`, and **39/39 unit tests in 8 files**. PostgreSQL-backed E2E and migration tests require a disposable test database; their earlier recorded results were not rerun for this DTO/documentation update. A previous 50k-entry run inspected SQL query plans, **not** HTTP throughput or 10k concurrent-coach capacity. Its SQL differs slightly from the current application query.
 
-The 50k harness uses 50,000 workout entries and 174,823 sets to inspect the main history and PR query shapes with `EXPLAIN (ANALYZE, BUFFERS)`. Those measurements are SQL query-plan evidence, not HTTP throughput or proof of 10k concurrent-coach capacity.
-
-See [`docs/verification.md`](docs/verification.md) for the exact test evidence, runtime safeguards, performance measurements, limitations, and reproduction commands.
+See [`docs/verification.md`](docs/verification.md) for recorded results, reproduction commands, and evidence limits.
 
 ## Trade-offs
 

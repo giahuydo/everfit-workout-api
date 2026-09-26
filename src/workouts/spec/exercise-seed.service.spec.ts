@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { ExerciseSeedService } from './exercise-seed.service.js';
+import { ExerciseSeedService } from '../exercise-seed.service.js';
 
 function fakeRepo() {
   const builder = {
@@ -18,11 +18,20 @@ function fakeRepo() {
 describe('ExerciseSeedService', () => {
   it('inserts configured rows in normalized order without overwriting existing rows', async () => {
     const path = join(mkdtempSync(join(tmpdir(), 'seed-')), 'exercises.json');
-    writeFileSync(path, JSON.stringify([{ name: 'Row', muscleGroup: 'back' }, { name: 'Curl', muscleGroup: null }]));
+    writeFileSync(
+      path,
+      JSON.stringify([
+        { name: 'Row', muscleGroup: 'back' },
+        { name: 'Curl', muscleGroup: null },
+      ]),
+    );
     const { builder, repo } = fakeRepo();
     const config = { get: vi.fn().mockReturnValue(path) };
 
-    await new ExerciseSeedService(repo as never, config as never).onModuleInit();
+    await new ExerciseSeedService(
+      repo as never,
+      config as never,
+    ).onModuleInit();
 
     expect(config.get).toHaveBeenCalledWith('EXERCISE_CATALOG_PATH');
     expect(builder.values.mock.calls).toEqual([
@@ -38,7 +47,10 @@ describe('ExerciseSeedService', () => {
     const { builder, repo } = fakeRepo();
 
     await expect(
-      new ExerciseSeedService(repo as never, { get: () => path } as never).onModuleInit(),
+      new ExerciseSeedService(
+        repo as never,
+        { get: () => path } as never,
+      ).onModuleInit(),
     ).rejects.toThrow('duplicates normalized name');
     expect(builder.execute).not.toHaveBeenCalled();
   });

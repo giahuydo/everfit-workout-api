@@ -1,6 +1,11 @@
-import { BadRequestException, HttpException, HttpStatus, type ArgumentsHost } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpException,
+  HttpStatus,
+  type ArgumentsHost,
+} from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
-import { HttpExceptionFilter } from './http-exception.filter.js';
+import { HttpExceptionFilter } from '../http-exception.filter.js';
 
 describe('HttpExceptionFilter', () => {
   it('maps bad requests to the documented validation error code', () => {
@@ -14,7 +19,10 @@ describe('HttpExceptionFilter', () => {
       }),
     } as ArgumentsHost;
 
-    new HttpExceptionFilter(logger as never).catch(new BadRequestException(['unit must be kg or lb']), host);
+    new HttpExceptionFilter(logger as never).catch(
+      new BadRequestException(['unit must be kg or lb']),
+      host,
+    );
 
     expect(json).toHaveBeenCalledWith({
       statusCode: 400,
@@ -36,7 +44,10 @@ describe('HttpExceptionFilter', () => {
       }),
     } as ArgumentsHost;
 
-    new HttpExceptionFilter(logger as never).catch({ type: 'entity.too.large', status: 413, stack: 'private stack' }, host);
+    new HttpExceptionFilter(logger as never).catch(
+      { type: 'entity.too.large', status: 413, stack: 'private stack' },
+      host,
+    );
 
     expect(status).toHaveBeenCalledWith(413);
     expect(json).toHaveBeenCalledWith({
@@ -60,13 +71,18 @@ describe('HttpExceptionFilter', () => {
     } as ArgumentsHost;
 
     new HttpExceptionFilter(logger as never).catch(
-      new HttpException({ message: 'Cursor is malformed', details: ['cursor must be a UUID'] }, HttpStatus.BAD_REQUEST),
+      new HttpException(
+        { message: 'Cursor is malformed', details: ['cursor must be a UUID'] },
+        HttpStatus.BAD_REQUEST,
+      ),
       host,
     );
 
-    expect(json).toHaveBeenCalledWith(expect.objectContaining({
-      details: ['cursor must be a UUID'],
-    }));
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        details: ['cursor must be a UUID'],
+      }),
+    );
   });
 
   it('keeps details null for 5xx responses', () => {
@@ -80,11 +96,16 @@ describe('HttpExceptionFilter', () => {
       }),
     } as ArgumentsHost;
 
-    new HttpExceptionFilter(logger as never).catch(new Error('private error'), host);
+    new HttpExceptionFilter(logger as never).catch(
+      new Error('private error'),
+      host,
+    );
 
-    expect(json).toHaveBeenCalledWith(expect.objectContaining({
-      statusCode: 500,
-      details: null,
-    }));
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        statusCode: 500,
+        details: null,
+      }),
+    );
   });
 });

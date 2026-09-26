@@ -4,7 +4,7 @@ import { Decimal } from 'decimal.js';
 import { assertRange } from '../common/date.js';
 import { normalizeExerciseName } from '../common/exercise-name.js';
 import { UnitsService, type WeightUnit } from '../units/units.service.js';
-import { ComparePrQueryDto, PrQueryDto } from '../workouts/dto/pr-query.dto.js';
+import { ComparePrQueryDto, PrQueryDto } from './dto/pr-query.dto.js';
 
 type Metric = 'heaviestSet' | 'highestVolume' | 'estimatedOneRepMax';
 
