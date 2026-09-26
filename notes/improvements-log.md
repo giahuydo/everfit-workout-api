@@ -1,6 +1,6 @@
 # Everfit improvement ledger (internal; not a submission artifact)
 
-Internal working notes. They are not part of the README/AI_WORKFLOW submission and make no claims beyond the cited evidence. The Everfit assignment and the [A01–A102 traceability](requirement-traceability.md) (now a historical snapshot) remain the ground truth for requirements. Log only additive, business-appropriate improvements, checked in this order: requirement coverage, then correctness, then additive quality, avoiding unnecessary over-engineering. Never weaken a requirement or claim that a proposal is implemented.
+Internal working notes. They are not part of the README/AI_WORKFLOW submission and make no claims beyond the cited evidence. The Everfit assignment and the [A01–A102 traceability](history/requirement-traceability.md) (now a historical snapshot) remain the ground truth for requirements. Log only additive, business-appropriate improvements, checked in this order: requirement coverage, then correctness, then additive quality, avoiding unnecessary over-engineering. Never weaken a requirement or claim that a proposal is implemented.
 
 **Status values**
 - `proposed`: not in the code on this branch.

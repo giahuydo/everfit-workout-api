@@ -1,55 +1,129 @@
 # Database Design
 
-Originally written as the planned design; the implemented schema is `src/database/migrations/1770000000000-initial-schema.ts`, and where the two differ, the migration is authoritative. Every UUID primary key defaults to `uuid_generate_v4()` (`uuid-ossp` extension) so application inserts, including catalog seeding, need not supply IDs.
+- **Source of truth:** `src/database/migrations/1770000000000-initial-schema.ts`.
+- **Schema policy:** PostgreSQL + TypeORM use explicit versioned migrations; production `synchronize` is disabled/rejected.
 
-PostgreSQL with TypeORM entities and **explicit versioned migrations**; do not use production `synchronize`. See [API design](api-design.md) for public contracts. A user ID is an opaque external key; there is no users table or authorization in this scope.
+## Schema at a glance
 
-## Tables
+```mermaid
+erDiagram
+    exercises ||--o{ workout_entries : has
+    workout_entries ||--|{ workout_sets : contains
 
-### `exercises`
-- `id` UUID primary key.
-- `name` text/varchar: preserved display spelling from first creation (later spelling variants do not rename it implicitly).
-- `normalized_name` text/varchar unique: trim surrounding whitespace + lowercase only. Use the *same* normalization for insert, exact PR lookup, and concurrent conflict handling; reject empty normalized names. Application normalization is the source of truth; store the normalized key with deterministic PostgreSQL `C` collation so uniqueness does not depend on deployment locale. Names are stable identifiers in this scope; aliases/renames are deferred.
-- `muscle_group` nullable varchar(80): configurable global catalog metadata loaded from a seed/config file. Matching is outer trim + lowercase exact equality. No admin API is added in this take-home; metadata edits affect subsequent filtering of historical entries because reads join current catalog metadata.
-- `created_at`, `updated_at` UTC `TIMESTAMPTZ` system timestamps.
+    exercises {
+      uuid id
+      varchar name
+      varchar normalized_name
+      varchar muscle_group
+      timestamptz created_at
+      timestamptz updated_at
+    }
 
-### `workout_entries`
-- `id` UUID primary key.
-- `user_id` varchar(128): non-blank opaque caller-supplied identifier.
-- `exercise_id` UUID foreign key to `exercises`.
-- `workout_date` PostgreSQL `DATE`: client-supplied calendar day, not a fabricated timestamp.
-- `created_at` UTC `TIMESTAMPTZ(6)`: ingestion time with PostgreSQL microsecond precision, assigned by database/service consistently. Ordering keys are immutable in this scope; cursor serialization must preserve all six fractional digits.
+    workout_entries {
+      uuid id
+      varchar user_id
+      uuid exercise_id
+      date workout_date
+      timestamptz created_at
+    }
 
-One entry per exercise occurrence in a bulk request; multiple identical exercise names and same-day entries are allowed. There is deliberately no uniqueness constraint on `(user_id, exercise_id, workout_date)`.
+    workout_sets {
+      uuid id
+      uuid workout_entry_id
+      smallint set_order
+      int reps
+      numeric original_weight
+      varchar original_unit
+      numeric weight_kg
+    }
+```
 
-### `workout_sets`
-- `id` UUID primary key.
-- `workout_entry_id` UUID foreign key with cascade delete.
-- `set_order` positive `smallint` (1-based submitted position), unique per entry (`uq_workout_sets_entry_order`, `UNIQUE(workout_entry_id, set_order)`).
-- `reps` positive integer, `1..10000`.
-- `original_weight NUMERIC(12,3)`, range `0..100000`.
-- `original_unit` supported code, initially `kg`/`lb`.
-- `weight_kg NUMERIC(15,6)`, converted with exact factor `1 lb = 0.45359237 kg` and rounded half-up to 6 decimals at write time.
+## Table responsibilities
 
-Check constraints should enforce basic positivity/non-negativity and valid dates/foreign keys even if application DTOs validate first. Do not hard-code a kg/lb-only SQL enum/check that makes adding a unit require scattered schema changes; unit validation belongs in a centralized registry with deliberate rollout. The proposed P0 numeric contract before migrations: parsed finite JSON-number weights in `[0, 100000]` are validated by normalized decimal **value** (not raw token lexeme) with at most 3 fractional places; trailing zeros such as `1.0000` do not create extra value precision. Convert the normalized numeric value to a decimal string before decimal-library arithmetic; reject values with additional nonzero decimals (e.g. `0.0001`). Original weight stores 3 places, canonical kg stores 6, PR ranking uses persisted canonical values, and response half-up rounding to at most 3 places is presentation-only. PostgreSQL `NUMERIC`/decimal libraries, not JS binary floats, perform comparison arithmetic; JSON numbers remain the public transport format.
+### `exercises` — shared identity and metadata
 
-## Transaction and concurrent exercise resolution
+- `normalized_name` is unique and uses application normalization: outer trim + lowercase only.
+- Original display spelling is retained from first creation.
+- `muscle_group` is nullable, configurable metadata loaded from the exercise catalog; it is not hard-coded in business logic.
+- UUID primary keys default to `uuid_generate_v4()`.
 
-One logging request is one database transaction: validate first, normalize names, create or retrieve exercises through a unique-key-safe upsert/conflict path, then insert all entries/sets. Under PostgreSQL **READ COMMITTED**, for each distinct normalized name run `INSERT ... ON CONFLICT DO NOTHING RETURNING`; when no row is returned, perform a **separate statement** `SELECT` by normalized key using the same transaction manager. This avoids check-then-insert races and same-statement visibility surprises. If any insert/validation fails, roll back the entire request. Metadata conflicts on concurrent upserts must not silently replace a curated value. Repeated same-day logging is permitted (no idempotency guarantee).
+### `workout_entries` — one exercise occurrence
 
-## Planned indexes and query shapes
+- `user_id` is the caller-supplied opaque client ID.
+- `exercise_id` references the shared exercise row.
+- `workout_date` is PostgreSQL `DATE`, not a fabricated timestamp.
+- `created_at` is UTC `TIMESTAMPTZ(6)` ingestion time used as a stable same-day ordering key.
+- Same user/exercise/date may appear more than once by design.
 
-- Unique B-tree `exercises(normalized_name)` for identity and exact PR lookup.
-- B-tree `workout_entries(user_id, workout_date DESC, created_at DESC, id DESC)` for unfiltered user history.
-- B-tree `workout_entries(user_id, exercise_id, workout_date DESC, created_at DESC, id DESC)` for exercise-scoped entry retrieval/date ranges; validate PR plan against joins and set scans.
-- B-tree `workout_sets(workout_entry_id)` for entry→set retrieval (implemented: the unique `(workout_entry_id, set_order)` constraint covers this prefix, so no separate index was added).
+### `workout_sets` — ordered set measurements
 
-History is filtered in SQL before paging **entries**, not joined set rows; select `limit + 1` entry IDs then fetch their sets in `set_order` order. Optional exercise-name substring and muscle-group predicates require joining `exercises`. For a partial name filter, normalize the search term in application code identically to exercise identity, escape `LIKE` wildcards `%`, `_` and `\`, and apply literal `%term%` `LIKE ... ESCAPE '\'` to `exercises.normalized_name` under its deterministic `C` collation (not locale-dependent `ILIKE` over the display name). A leading-wildcard `LIKE` cannot use a normal B-tree for the substring predicate; an indexed user/date path may still be adequate. Do not add `pg_trgm` by default. Collect representative `EXPLAIN (ANALYZE, BUFFERS)` for the actual filters, deep pages, and 50k+ entries/user, then consider trigram/search indexes or query changes if warranted. Indexes are hypotheses, not throughput guarantees.
+- `set_order` is 1-based and unique within one entry.
+- `reps` is an integer `1..10000`.
+- `original_weight NUMERIC(12,3)` and `original_unit` preserve submitted measurement semantics.
+- `weight_kg NUMERIC(15,6)` is the canonical calculation value.
+- Deleting an entry cascades to its sets.
 
-PR candidate sets join entries and exercises; filter by `user_id`, **exact** `normalized_name`, and inclusive `workout_date` bounds. Rank independently for each metric on canonical kg:
+## Why store original and canonical weight?
 
-- heaviest: `weight_kg`
-- volume: `reps * weight_kg`
-- Epley: `weight_kg * (1 + reps::NUMERIC / 30::NUMERIC)` with explicit decimal division (never integer or JS binary-float division)
+```text
+submitted 225 lb
+      │
+      ├────────► original_weight = 225, original_unit = lb
+      │
+      └────────► decimal conversion ─────► weight_kg = 102.058284
+                                              │
+                                              ├─ history unit conversion
+                                              └─ PR ranking / volume / 1RM
+```
 
-Use metric DESC then `workout_date ASC, created_at ASC, workout_entry.id ASC, set_order ASC, workout_set.id ASC`; a unique final set ID closes any tie. The winner's `workout_date` is `achievedDate`, not proof of the first real-world occurrence. Convert/round **after** winner selection. Compare ranges with the same query rules, independently. An empty candidate set returns null metrics, not an exception.
+Canonical kg gives one comparison basis across units. Original values preserve what the caller sent. Conversion uses exact `1 lb = 0.45359237 kg` with decimal arithmetic; PR winners are selected from persisted canonical values before display rounding.
+
+## Atomic write and concurrent exercise resolution
+
+One logging request is one PostgreSQL transaction.
+
+For each distinct normalized exercise name, the service executes `INSERT ... ON CONFLICT DO NOTHING RETURNING`. If another transaction already created the row, it performs a separate `SELECT` using the same transaction manager. This avoids a check-then-insert race while preserving curated metadata.
+
+```text
+BEGIN
+  resolve/create exercises in deterministic name order
+  insert workout_entries
+  insert workout_sets
+COMMIT
+```
+
+Any failure rolls back the entire request. There is no uniqueness constraint on `(user_id, exercise_id, workout_date)` because repeated same-day logging is valid.
+
+## Indexes and the queries they support
+
+| Index / constraint | Purpose |
+| --- | --- |
+| unique `exercises(normalized_name)` | identity, conflict-safe creation, exact PR lookup |
+| `workout_entries(user_id, workout_date DESC, created_at DESC, id DESC)` | user history and keyset ordering |
+| `workout_entries(user_id, exercise_id, workout_date DESC, created_at DESC, id DESC)` | exercise/date-scoped PR candidate entries |
+| unique `workout_sets(workout_entry_id, set_order)` | ordered set lookup and uniqueness within entry |
+
+History pages entries first, then loads sets. Optional partial-name and muscle-group filters join `exercises`. A leading-wildcard substring filter cannot use a normal B-tree for the name predicate, so `pg_trgm` was deliberately not added until evidence shows a need.
+
+## PR query shape
+
+PR candidate rows join `exercises → workout_entries → workout_sets`, filter by user, exact normalized exercise name, and optional inclusive date range, then independently rank:
+
+- `weight_kg`;
+- `reps * weight_kg`;
+- `weight_kg * (1 + reps::NUMERIC / 30::NUMERIC)`.
+
+Tie order after metric DESC is `workout_date ASC, created_at ASC, entry id ASC, set_order ASC, set id ASC`.
+
+## Measured behavior and limits
+
+One local 50k-entry run showed fast first-page history and ~31–34 ms PR query plans, but also exposed two limits: the expanded deep-page keyset predicate was used as an index filter rather than an index bound, and PR plans scanned all `workout_sets` in parallel. These are documented evidence, not hidden by the design.
+
+See [the experiments log](../notes/experiments.md) and [raw evidence](../notes/evidence/README.md) for exact plans, timings, and caveats.
+
+## Related decisions
+
+- [ADR 001 — PostgreSQL](decisions/001-postgresql.md)
+- [ADR 002 — Canonical weight normalization](decisions/002-canonical-weight-normalization.md)
+- [ADR 003 — Workout date and timezone semantics](decisions/003-workout-date-and-timezone.md)
+- [ADR 004 — Cursor pagination](decisions/004-cursor-pagination.md)

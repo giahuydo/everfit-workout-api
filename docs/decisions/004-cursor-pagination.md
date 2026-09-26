@@ -1,23 +1,43 @@
 # ADR 004 — Cursor Pagination
 
-Status: accepted and implemented. Keyset `(workout_date DESC, created_at DESC, id DESC)` with six-digit UTC microsecond cursor keys and a scope hash (`src/workouts/workouts.service.ts`); cursor ids accept any canonical PostgreSQL `uuid` text, not only RFC 4122 v1–5 (`559d630`). Covered by cursor-shape, malformed-cursor, scope-mismatch, and non-RFC-UUID tests, plus migration-backed paging across `md5(...)::uuid` keys. Deep-page cost limitation measured in [experiments](../../notes/experiments.md).
+**Status:** Accepted and implemented.
 
 ## Context
 
-Workout history must support pagination and remain useful with 50k+ entries per user. Offset pagination is simple but can become expensive and unstable at deep offsets while new rows are inserted.
+Workout history must paginate and remain useful with 50k+ entries per user. Deep offset pagination can repeatedly scan/skips rows and becomes unstable as new rows are inserted.
 
 ## Decision
 
-Use keyset pagination ordered by `(workout_date DESC, created_at DESC, id DESC)`. Encode all three immutable keys into a versioned opaque cursor bound to `userId`, effective filters, output unit, and page size. Preserve `created_at` as UTC ISO text with six fractional digits from `TIMESTAMPTZ(6)`; never round-trip through a millisecond-precision JS Date. Reject malformed or mismatched cursors with 400.
+Use keyset pagination ordered by:
 
-## Rationale
+```text
+workout_date DESC → created_at DESC → id DESC
+```
 
-Keyset pagination can continue from the last row without scanning/skipping a deep offset. `workout_date` is the primary user-facing order, `created_at` gives a practical same-day ingestion order, and `id` provides a deterministic final tie-break.
+The opaque versioned cursor stores all three last-row keys and binds them to `userId`, effective filters, requested unit, and page size. `created_at` is serialized with all six PostgreSQL microsecond digits.
+
+Malformed cursors or cursors reused with different effective query parameters return `400`.
+
+## Why
+
+- `workout_date` matches the user-facing chronology;
+- `created_at` provides practical same-day ingestion order;
+- `id` closes the deterministic ordering;
+- keyset continuation avoids semantic dependence on a numeric offset.
+
+The scope hash detects accidental query mismatch. It is not authentication, authorization, secrecy, or tamper-proof signing.
 
 ## Consequences
 
-- The supporting entry index begins with `user_id` followed by the three ordering keys.
-- Date bounds are inclusive; for descending order, the continuation predicate is `(workout_date, created_at, id) < (last_date, last_created_at, last_id)` under the same SQL filters. Fetch `limit + 1` **entries**, then their sets, to determine `hasMore` without splitting an entry across pages.
-- Base64url JSON plus an unsigned canonical query hash detects mismatched parameters, **not** cursor tampering; no authentication, authorization or cryptographic integrity is claimed. Decode/validate safely. Immutable ordering keys are assumed for this create-only scope.
-- `created_at` is ingestion time, not workout time.
-- This is not snapshot pagination. New rows committed between page requests can appear before or after the cursor depending on their keys; edits to current exercise muscle-group metadata can also change filtered membership between pages. The API must not promise repeatable-read pagination semantics.
+- supporting index begins with `user_id` plus the three ordering keys;
+- continuation is lexicographically older than the final row under the same filters;
+- fetch `limit + 1` **entries**, then load sets, so a page never splits an entry;
+- pagination is not a database snapshot across requests;
+- concurrent inserts and catalog metadata edits may change what later pages contain;
+- HMAC signing is deferred unless cursor integrity becomes a product/security requirement.
+
+## Measured limitation
+
+The recorded 50k run showed the current expanded keyset predicate acting as an index `Filter` at deep pages, removing 25,001 rows rather than becoming an index bound. The next evidence-driven optimization would be a row-value comparison, followed by re-measurement—not extra infrastructure by default.
+
+See [`notes/experiments.md`](../../notes/experiments.md).

@@ -1,40 +1,141 @@
 # Architecture
 
-## Scope
+- **Audience:** engineers reviewing or extending the service.
+- **Goal:** understand the system shape and the reasons behind it before reading endpoint or SQL details.
 
-A single NestJS service exposes workout logging, workout history, and personal-record APIs. PostgreSQL is the source of truth. The take-home intentionally avoids microservices, Redis, queues, search engines, and other infrastructure that is not required by the assignment.
+## The shape of the system
 
-## Module boundaries
+The take-home is intentionally one stateless NestJS service backed by PostgreSQL. The application layer owns validation and use-case orchestration; PostgreSQL owns durable state, transactional writes, filtering, and PR ranking.
 
-- `workouts`: validated bulk logging and workout history.
-- `exercises`: shared global exercise identity and configurable muscle-group metadata loaded from seed/config; no admin API in this scope.
-- `units`: extensible weight conversion and response-unit formatting.
-- `personal-records`: PR aggregation and range comparison.
-- `common`: configuration, validation, logging, errors, request IDs, pagination helpers.
+```text
+                         COACH / CLIENT APP
+                                │
+                                │ HTTP / JSON
+                                ▼
+╔═══════════════════════ NESTJS API ═══════════════════════╗
+║                                                         ║
+║  WorkoutsController          PersonalRecordsController  ║
+║          │                              │               ║
+║          ▼                              ▼               ║
+║   WorkoutsService              PersonalRecordsService   ║
+║          │                              │               ║
+║          ├──────── UnitsService ────────┤               ║
+║          │                                              ║
+║          └──── validation · transactions · SQL queries  ║
+╚════════════════════════════╦════════════════════════════╝
+                             │ TypeORM / SQL
+                             ▼
+╔════════════════════════ POSTGRESQL ══════════════════════╗
+║                                                         ║
+║  exercises  ───────►  workout_entries  ───────► sets   ║
+║  identity + metadata   user/date/exercise        reps   ║
+║                                               weights   ║
+╚═════════════════════════════════════════════════════════╝
+```
 
-Controllers should remain thin. Application services orchestrate use cases. Persistence/query concerns stay behind repositories or dedicated query services. Unit conversion is injected behind a small abstraction rather than scattered `if/else` logic.
+The design deliberately does **not** add Redis, queues, search infrastructure, or microservices without a requirement or measurement that needs them.
+
+## Business flow
+
+The stored workout sets are the source data; history and PRs are read models derived from them.
+
+```text
+client completes workout
+        │
+        ▼
+   log workout
+        │
+        ├────────► workout history ─────► coach reviews activity
+        │
+        └────────► personal records ────► compare periods ────► coach sees progress
+```
+
+This is why the service has a small write path and richer read/query behavior rather than separate state for history or PRs.
+
+## Module responsibilities
+
+| Area | Responsibility |
+| --- | --- |
+| `workouts` | Atomic bulk logging, history filters, keyset pagination, exercise resolution |
+| `personal-records` | Heaviest-set, highest-volume, Epley 1RM, and range comparison queries |
+| `units` | Central kg/lb registry, canonical conversion, response formatting |
+| exercise catalog | Shared exercise identity plus configurable muscle-group metadata |
+| `common` / `config` | Date/name helpers, validation, errors, request IDs, runtime configuration |
+| database migration | Tables, constraints, indexes, UUID defaults; schema source of truth |
+
+Controllers stay thin. Services own use cases. Unit conversion is centralized rather than repeated in endpoint code.
 
 ## Write flow
 
-`POST workout → validate DTO → normalize exercise names → transactionally resolve/create exercises by unique normalized name, convert each weight to canonical kg, and persist all entries + sets → return created result`. Decimal-safe arithmetic uses exact conversion factors and fixed storage precision; repeated same-day exercise occurrences remain separate entries.
+```text
+POST workout
+    │
+    ▼
+validate route + body
+    │
+    ▼
+normalize exercise names
+    │
+    ▼
+BEGIN TRANSACTION
+    │
+    ├─ resolve/create shared exercises safely
+    ├─ convert each submitted weight to canonical kg
+    ├─ insert workout entries
+    └─ insert ordered sets
+    │
+    ▼
+COMMIT → return original submitted values
+```
 
-One request is one transaction. If any exercise or set is invalid or persistence fails, no part of that bulk request remains committed.
+One request is one transaction. A validation or persistence failure leaves no partial workout behind. Repeated same-day exercise occurrences remain separate entries; there is no deduplication or idempotency promise in this scope.
 
-## Read flow
+## Read flows
 
-History queries filter **entries** in PostgreSQL, including literal substring search on application-normalized exercise names, before keyset pagination, then load the selected entries' ordered sets; they never page joined set rows. PR queries resolve an exact normalized exercise name and rank sets in PostgreSQL using canonical kg expressions with deterministic ties. Output-unit conversion happens after selection of the winning row. Valid no-data queries return 200 with empty history or null PRs.
+### Workout history
+
+History filters **entries** in PostgreSQL before pagination. The service selects a page of entry IDs using `(workout_date, created_at, id)`, then loads the ordered sets for those entries. Joined set rows are never paginated directly.
+
+```text
+filters → indexed entry query → keyset page → load sets → convert display unit → response
+```
+
+### Personal records
+
+PR lookup resolves one exact normalized exercise name, then asks PostgreSQL to rank candidate sets independently for:
+
+- heaviest weight;
+- highest `reps × weight` volume;
+- highest Epley `weight × (1 + reps/30)` estimate.
+
+Winner selection happens on persisted canonical kg. Output-unit conversion happens only after the winning row is known.
 
 ## Time model
 
-`workout_date` is a calendar date supplied by the client, with inclusive date filters. System timestamps such as `created_at` are UTC `TIMESTAMPTZ(6)` values; history cursors preserve all six fractional digits of ingestion time. The service does not invent a workout timestamp or client timezone. Within the same workout date, `created_at` improves deterministic display ordering but is not the actual workout time.
+`workout_date` is the calendar day supplied by the caller and is stored as PostgreSQL `DATE`. `created_at` is UTC ingestion time (`TIMESTAMPTZ(6)`), not workout time. The API never invents midnight UTC or a client timezone that was not supplied.
+
+This keeps the model faithful to the assignment while still providing deterministic same-day pagination.
+
+## Operational boundaries
+
+- Request body: 256 KiB maximum.
+- Bulk logging: at most 50 exercises/request and 50 sets/exercise.
+- Exercise name: 120 characters maximum after normalization.
+- User ID: 128 characters maximum.
+- History page: default 20, maximum 100.
+- Production schema synchronization is rejected; versioned migrations own schema changes.
+- Readiness checks include database connectivity; liveness only checks the process.
+- `userId` is an opaque route parameter, not authentication. A real product deployment needs identity and authorization.
 
 ## Scaling stance
 
-The implementation target is a correct indexed PostgreSQL design for 50k+ entries/user, verified with representative query plans rather than an unmeasured throughput claim. The video may discuss stateless horizontal API scaling, connection-pool limits, read replicas, caching, projections, or partitioning as future options for 10k concurrent coaches, but these are not claimed as implemented capacity. `userId` is a route parameter, not an authorization mechanism; a real deployment requires an explicit access-control policy.
+The implemented target is correct behavior and query plans for **50k+ workout entries per user**. Recorded evidence is query-plan evidence, not a claim of 10k concurrent-user capacity.
 
+If measured load later requires more capacity, the next steps would be evidence-driven: stateless API replicas, explicit connection-pool control/PgBouncer, query/index improvements, read replicas or cached/projection reads for hot PR workloads, and only then more complex infrastructure.
 
-## Frozen operational bounds
+## Related docs
 
-The take-home bounds requests deliberately: 256 KiB body, 50 exercises/request, 50 sets/exercise, 120-char exercise names, 128-char user IDs, and history pages default/max 20/100. These limits keep transaction and response sizes predictable without adding queues or asynchronous ingestion. Pool, query and transaction timeouts are configuration-managed.
-
-Exercise catalog creation is conflict-safe under concurrent logging via unique normalized identity plus insert-on-conflict followed by a separate select in the same transaction. Cursor payloads bind pagination state to the effective query but unsigned hashes are not tamper protection or authorization tokens; catalog metadata edits can alter filtered membership between pages.
+- [API design](api-design.md)
+- [Database design](database-design.md)
+- [ADRs](decisions/)
+- [Measured query plans](../notes/experiments.md)
