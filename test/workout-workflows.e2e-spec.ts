@@ -206,7 +206,7 @@ describe('workout assignment workflows', () => {
   });
 
   it('returns the documented cursor page shape and a valid exhausted no-data page', async () => {
-    await seedWorkout('cursor-user', 'Cursor Lift', [{ reps: 5, weight: 50, unit: 'kg' }], '2026-09-22');
+    const older = await seedWorkout('cursor-user', 'Cursor Lift', [{ reps: 5, weight: 50, unit: 'kg' }], '2026-09-22');
     await seedWorkout('cursor-user', 'Cursor Lift', [{ reps: 5, weight: 60, unit: 'kg' }], '2026-09-23');
     const first = await request(app.getHttpServer()).get('/v1/users/cursor-user/workouts?limit=1');
     expect(first.status).toBe(200);
@@ -218,9 +218,17 @@ describe('workout assignment workflows', () => {
     const cursor = first.body.page.nextCursor as string;
     const second = await request(app.getHttpServer()).get(`/v1/users/cursor-user/workouts?limit=1&cursor=${encodeURIComponent(cursor)}`);
     expect(second.status).toBe(200);
+    expect(second.body.items).toEqual([expect.objectContaining({ id: older.id })]);
     expect(second.body.page).toEqual({ limit: 1, hasMore: false, nextCursor: null });
-    const exhausted = await request(app.getHttpServer()).get(`/v1/users/cursor-user/workouts?limit=1&cursor=${encodeURIComponent(second.body.page.nextCursor ?? cursor)}`);
+
+    await dataSource.query('DELETE FROM workout_entries WHERE id = $1', [older.id]);
+    const exhausted = await request(app.getHttpServer()).get(`/v1/users/cursor-user/workouts?limit=1&cursor=${encodeURIComponent(cursor)}`);
     expect(exhausted.status).toBe(200);
+    expect(exhausted.body).toEqual({
+      items: [],
+      page: { limit: 1, hasMore: false, nextCursor: null },
+      message: expect.stringMatching(/no workouts found/i),
+    });
   });
 
   it('rejects malformed and scope-mismatched history cursors', async () => {

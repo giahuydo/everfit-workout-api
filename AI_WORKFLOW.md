@@ -42,9 +42,9 @@ The verification loop for generated tests was: generated tests → actual databa
 
 This workflow describes real review decisions, not a claim that every command or performance harness has succeeded on every machine. The README reports the current runnable commands and their environmental requirements. No private prompt chain or hidden reasoning is reproduced here.
 
-On this branch, on 2026-09-26: `pnpm build` passed, `pnpm lint` reported 0 warnings and 0 errors, `pnpm test` passed 36/36 in 7 files, `pnpm test:e2e` passed 21/21 in 2 files, and `pnpm test:e2e:migrations` passed 2/2. A clean Docker/Compose build and startup also passed after pinning pnpm 10.28.2; migrations completed before app startup, liveness/readiness were healthy, and a POST workout smoke request returned 201. The 50k numbers are from one earlier query-plan run, described with their limits in [experiments](notes/experiments.md).
+On this branch, on 2026-09-26: `pnpm build` passed, `pnpm lint` reported 0 warnings and 0 errors, `pnpm test` passed 36/36 in 7 files, `pnpm test:e2e` passed 23/23 in 2 files, and `pnpm test:e2e:migrations` passed 2/2. A clean Docker/Compose build and startup also passed after pinning pnpm 10.28.2; migrations completed before app startup, liveness/readiness were healthy, and a POST workout smoke request returned 201. The 50k numbers are from one earlier query-plan run, described with their limits in [experiments](notes/experiments.md).
 
-Two verification gaps were found after the 19/19 run. Neither is attributed to a specific AI output, because no retained session record shows its origin:
+Three verification gaps were found after the 19/19 run. Neither is attributed to a specific AI output, because no retained session record shows its origin:
 
 - **Synchronized schema versus migrations.** The workflow e2e suite builds its schema with `DB_SYNCHRONIZE=true`, so it passed while app startup on a freshly migrated database failed for lack of UUID defaults. Fixed by `a920c68`; `559d630` added `test/migrations.e2e-spec.ts`, which boots the app on versioned migrations with `DB_SYNCHRONIZE=false`.
 - **Test database isolation.** The workflow suite created its database only if it was missing, so schema or data left by an earlier run or branch could carry over. `a5046ed` drops and recreates it on every run.
