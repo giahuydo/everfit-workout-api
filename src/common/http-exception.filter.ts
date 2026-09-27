@@ -1,6 +1,7 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { Logger } from 'nestjs-pino';
+import { resolveRequestId } from './request-id.js';
 
 interface ErrorResponse {
   message?: string | string[];
@@ -16,7 +17,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const context = host.switchToHttp();
     const request = context.getRequest<Request & { id?: string }>();
     const response = context.getResponse<Response>();
-    const requestId = request.id ?? 'unknown';
+    // Body-parser rejections (413) happen before pino-http assigns request.id.
+    const requestId = request.id ?? resolveRequestId(request, response);
     const isHttpException = exception instanceof HttpException;
     const statusCode = isHttpException ? exception.getStatus() : this.statusFor(exception);
     const body = isHttpException ? exception.getResponse() : undefined;

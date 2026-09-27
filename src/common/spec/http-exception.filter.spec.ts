@@ -59,6 +59,47 @@ describe('HttpExceptionFilter', () => {
     });
   });
 
+  it('assigns a request id when the body parser rejects before pino-http runs', () => {
+    const json = vi.fn();
+    const status = vi.fn(() => ({ json }));
+    const setHeader = vi.fn();
+    const logger = { error: vi.fn(), warn: vi.fn() };
+    const host = {
+      switchToHttp: () => ({
+        getRequest: () => ({ headers: {} }),
+        getResponse: () => ({ status, setHeader, headersSent: false }),
+      }),
+    } as unknown as ArgumentsHost;
+
+    new HttpExceptionFilter(logger as never).catch(
+      { type: 'entity.too.large', status: 413 },
+      host,
+    );
+
+    const payload = json.mock.calls[0]?.[0] as { requestId: string };
+    expect(payload.requestId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(setHeader).toHaveBeenCalledWith('x-request-id', payload.requestId);
+  });
+
+  it('reuses a safe client-supplied x-request-id on early rejections', () => {
+    const json = vi.fn();
+    const status = vi.fn(() => ({ json }));
+    const logger = { error: vi.fn(), warn: vi.fn() };
+    const host = {
+      switchToHttp: () => ({
+        getRequest: () => ({ headers: { 'x-request-id': 'client-trace-1' } }),
+        getResponse: () => ({ status, setHeader: vi.fn(), headersSent: false }),
+      }),
+    } as unknown as ArgumentsHost;
+
+    new HttpExceptionFilter(logger as never).catch(
+      { type: 'entity.too.large', status: 413 },
+      host,
+    );
+
+    expect(json).toHaveBeenCalledWith(expect.objectContaining({ requestId: 'client-trace-1' }));
+  });
+
   it('preserves explicit array details for non-5xx responses', () => {
     const json = vi.fn();
     const status = vi.fn(() => ({ json }));

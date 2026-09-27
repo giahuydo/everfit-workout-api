@@ -2,10 +2,10 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { LoggerModule } from 'nestjs-pino';
-import { randomUUID } from 'node:crypto';
 import { validateEnvironment } from './config/environment.js';
 import { HealthController } from './health.controller.js';
 import { HttpExceptionFilter } from './common/http-exception.filter.js';
+import { resolveRequestId } from './common/request-id.js';
 import { UnitsModule } from './units/units.module.js';
 import { WorkoutsModule } from './workouts/workouts.module.js';
 
@@ -15,12 +15,7 @@ import { WorkoutsModule } from './workouts/workouts.module.js';
     LoggerModule.forRoot({
       pinoHttp: {
         autoLogging: true,
-        genReqId: (request, response) => {
-          const supplied = request.headers['x-request-id'];
-          const requestId = typeof supplied === 'string' && /^[A-Za-z0-9._-]{1,128}$/.test(supplied) ? supplied : randomUUID();
-          response.setHeader('x-request-id', requestId);
-          return requestId;
-        },
+        genReqId: (request, response) => resolveRequestId(request, response),
         customProps: (request) => ({ requestId: request.id }),
         redact: ['req.headers.authorization', 'req.headers.cookie', 'res.headers.set-cookie', 'req.body.password', 'req.body.token'],
       },
