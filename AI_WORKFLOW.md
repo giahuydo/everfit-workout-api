@@ -56,7 +56,7 @@ The first feature commits (`71aec40`–`f40e4c3`) predate the retained executor 
 
 The generated E2E commit `bcecfe9` expected `pageInfo.nextCursor`, a removed `deltaAminusB`, and an incorrect `achievedDate`; its test bootstrap also differed from production validation/filter wiring.
 
-A real PostgreSQL run produced **12 failures**. The failures were reviewed rather than blindly "fixed to green": stale assertions were separated from real product/harness issues, then corrected in `6259c48` and `6dd112b`. That cycle later reached 19/19 for the workflow suite and was followed by additional migration-backed coverage.
+A real PostgreSQL run produced **12 failures**. The failures were reviewed rather than blindly "fixed to green": stale assertions were separated from real product/harness issues, then corrected in `6ca7daa` and `3840666`. That cycle later reached 19/19 for the workflow suite and was followed by additional migration-backed coverage.
 
 ```text
 generated tests
@@ -92,23 +92,25 @@ The effective pattern was to provide constraints before asking for implementatio
 
 A green test suite is evidence only for the environment and layer it actually exercised. This mattered three times:
 
-1. **Synchronized schema vs. migrations.** Workflow E2E used `DB_SYNCHRONIZE=true`, so it could not catch missing UUID defaults in the versioned migration. `a920c68` fixed the migration; `559d630` added migration-backed E2E with `DB_SYNCHRONIZE=false`.
-2. **Test database isolation.** The workflow suite originally reused an existing DB. `a5046ed` changed it to drop/recreate the disposable DB each run.
-3. **Docker reproducibility.** A clean image build selected a newer pnpm whose release-age policy rejected fresh lockfile packages. `2557505` pinned pnpm 10.28.2 for host/Docker reproducibility.
+1. **Synchronized schema vs. migrations.** Workflow E2E used `DB_SYNCHRONIZE=true`, so it could not catch missing UUID defaults in the versioned migration. `068c29b` fixed the migration; `a8c3d46` added migration-backed E2E with `DB_SYNCHRONIZE=false`.
+2. **Test database isolation.** The workflow suite originally reused an existing DB. `c676664` changed it to drop/recreate the disposable DB each run.
+3. **Docker reproducibility.** A clean image build selected a newer pnpm whose release-age policy rejected fresh lockfile packages. `92d2bf2` pinned pnpm 10.28.2 for host/Docker reproducibility.
 
 These are process findings, not fabricated AI-error stories; no retained record proves which tool/person introduced them.
 
 ## Current verification
 
-Current uncommitted workspace: `pnpm build` and `pnpm lint` passed; `pnpm test` passed **39/39 in 8 files**. The later module-local spec and OpenAPI refactors have not had a fresh DB-backed E2E/Compose run.
+On 2026-09-27, at the current HEAD:
 
-Earlier verification recorded on 2026-09-26:
+- `pnpm build` and `pnpm lint` — pass;
+- `pnpm test` — 73/73 in 11 files (unit and contract specs);
+- `pnpm test:e2e` — 33/33 in 2 DB-backed files, including the migration-backed suite;
+- fresh-clone `docker compose up --build` — migration completed before app startup, `/health/ready` healthy, all four endpoints plus 400/413 checked by hand;
+- 50k query-plan harness rerun after the row-value keyset change (see [`docs/verification.md`](docs/verification.md)).
 
-- `pnpm test:e2e` — 23/23 in 2 DB-backed files;
-- `pnpm test:e2e:migrations` — 2/2;
-- clean Docker/Compose startup — migration completed before app startup; live/ready healthy; POST workout smoke returned 201.
+## Commit history
 
-See [`docs/verification.md`](docs/verification.md) for the current/local versus historical DB verification boundary. The 50k timings come from one earlier local query-plan run and are intentionally described with limitations in [`notes/experiments.md`](notes/experiments.md).
+The initial scaffold (`8a542b3`–`f40e4c3`) was written in one working session and split into reviewable commits afterwards, which is why those commits are minutes apart. Later commits follow the actual review → fix → verify cycles. Before publishing, small consecutive documentation commits were squashed and vague messages reworded; no code change was reordered across a dependency, every rewritten commit reproduces an original tree, and commit references in these docs point to the published hashes.
 
 ## Supporting evidence
 

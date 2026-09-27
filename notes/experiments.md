@@ -38,11 +38,11 @@ Use this file only for measurements actually run during implementation. Do not p
 ## 50k query-plan verification — measured once
 
 - Date: 2026-09-25 23:57 +07:00 (modification time of the recorded output files; earlier notes said "2026-09-26 local time", which was the documentation date, not the run time)
-- Git state: `integration/final`, after `6259c48`. Later changes relevant to this run: `a920c68` added UUID primary-key defaults to the migration (no index change; the seed supplies explicit IDs, so the measured plans are unaffected), and `559d630` aligned `explain-50k.sql` with the service's `LIMIT 21` lookahead and final `ws.id` PR tie key. The run has not been repeated with the updated script.
+- Git state: `integration/final`, after `6ca7daa`. Later changes relevant to this run: `068c29b` added UUID primary-key defaults to the migration (no index change; the seed supplies explicit IDs, so the measured plans are unaffected), and `a8c3d46` aligned `explain-50k.sql` with the service's `LIMIT 21` lookahead and final `ws.id` PR tie key. The run has not been repeated with the updated script.
 - Question being tested: whether the two existing `workout_entries` indexes are sufficient for representative history and all three personal-record query shapes before proposing another index.
 - Dataset shape: one user, 50,000 workout entries, 174,823 sets (2–5 per entry), seven distinct exercises used out of eight seeded catalog rows, dates 2022-09-27 through 2026-09-25 skewed toward the last 90 days.
 - Environment: fresh PostgreSQL 16-alpine container on port 55433; one local warm-ish run (all buffers `shared hit`); hardware not recorded.
-- Migration verification: the versioned migration (its revision before `a920c68`, without UUID defaults) succeeded from an empty database with `pnpm migration:run`; `pnpm migration:show` returned `[X] 1 InitialSchema1770000000000`. That command output was not saved to a file. The current migration is exercised by `test/migrations.e2e-spec.ts` (2/2 on 2026-09-26).
+- Migration verification: the versioned migration (its revision before `068c29b`, without UUID defaults) succeeded from an empty database with `pnpm migration:run`; `pnpm migration:show` returned `[X] 1 InitialSchema1770000000000`. That command output was not saved to a file. The current migration is exercised by `test/migrations.e2e-spec.ts` (2/2 on 2026-09-26).
 - Command: `scripts/perf/run-50k-evidence.sh` (runs `scripts/perf/seed-50k.sql` then `scripts/perf/explain-50k.sql`).
 - Evidence: [`notes/evidence/2026-09-25-local-50k-seed.out`](evidence/2026-09-25-local-50k-seed.out) and [`notes/evidence/2026-09-25-local-50k-explain.out`](evidence/2026-09-25-local-50k-explain.out), verbatim copies of the original `/tmp/everfit-perf-evidence/` output; provenance and checksums in [`notes/evidence/README.md`](evidence/README.md).
 
@@ -61,7 +61,7 @@ Limitations:
 
 - **Deep pages are not O(page size).** The expanded `OR` predicate is not used as an index bound, so page N reads roughly all earlier rows for that user. It is fast at 25k rows in cache but grows linearly with depth.
 - **PR queries scan all sets in parallel.** The entries side is indexed, but `workout_sets` is read via parallel sequential scan and hash-joined. Cost grows with total set count, not with the date range.
-- **Representative SQL, not captured service SQL.** The history queries are hand-written equivalents of the TypeORM query. In the recorded run, history used `LIMIT 51` and the PR queries omitted the service's final `ws.id` tie-breaker (redundant for ordering given unique `(workout_entry_id, set_order)`) and some selected columns. `559d630` updated the script to `LIMIT 21` and the `ws.id` tie key; those timings are not measured.
+- **Representative SQL, not captured service SQL.** The history queries are hand-written equivalents of the TypeORM query. In the recorded run, history used `LIMIT 51` and the PR queries omitted the service's final `ws.id` tie-breaker (redundant for ordering given unique `(workout_entry_id, set_order)`) and some selected columns. `a8c3d46` updated the script to `LIMIT 21` and the `ws.id` tie key; those timings are not measured.
 - **One run.** No repetitions, percentiles, cold-cache run, HTTP latency, concurrency, or throughput. It does not show capacity for 10k concurrent coaches.
 
 ### Decision
