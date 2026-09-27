@@ -24,27 +24,25 @@ Migration-backed E2E starts from a fresh database with `DB_SYNCHRONIZE=false`, r
 
 ## 50k query-plan evidence
 
-The recorded (earlier) deterministic harness run used one user with 50,000 workout entries and 174,823 sets across seven exercises, covering dates from 2022-09-27 through 2026-09-25.
+The deterministic harness seeds one user with 50,000 workout entries and 174,823 sets across seven exercises, covering dates from 2022-09-27 through 2026-09-25.
 
-Recorded `EXPLAIN (ANALYZE, BUFFERS)` execution times from the local evidence run:
+`EXPLAIN (ANALYZE, BUFFERS)` execution times, 2026-09-27, fresh PostgreSQL 16 container, seeded once and `explain-50k.sql` run five times (range across runs):
 
-| Query shape | Time |
-| --- | ---: |
-| History, unfiltered first page | 0.179 ms |
-| History, partial name + date + muscle group | 0.075 ms |
-| History, deep keyset page after row 25,001 | 7.359 ms |
-| PR heaviest / highest volume / estimated 1RM | 30.783 / 31.498 / 34.247 ms |
+| Query shape | Before (expanded `OR` keyset) | After (row-value keyset) |
+| --- | ---: | ---: |
+| History, unfiltered first page | 0.10–0.15 ms | 0.09–0.58 ms |
+| History, partial name + date + muscle group | 0.04–0.06 ms | 0.05–0.09 ms |
+| History, deep keyset page after row 25,001 | 5.8–9.2 ms, ~25,356 buffers | 0.10–0.60 ms, 27 buffers |
+| PR heaviest / highest volume / estimated 1RM | 27–32 / 29–31 / 31–39 ms | 25–41 / 29–40 / 32–50 ms (one run hit 125 ms on heaviest) |
 
-These are SQL execution-plan timings from one local warm-ish run. They are not HTTP latency, throughput, a repeated benchmark, or evidence that the service supports 10,000 concurrent coaches.
+Only the deep-page predicate changed between the two columns; other differences are run-to-run noise on a laptop. These are SQL execution-plan timings, not HTTP latency, throughput, percentiles, or evidence that the service supports 10,000 concurrent coaches.
 
 ## What the plans show
 
 - The first history page and the representative filtered history query are cheap at the measured dataset size.
-- The deep keyset predicate still filtered 25,001 earlier rows and touched 25,386 buffers in the recorded run, so deep-page cost still grows with page depth.
-- PR queries select the user's entries efficiently but still scan a significant number of `workout_sets`, so PR cost grows with accumulated set count.
+- The deep keyset page now uses the row-value predicate as an `Index Cond` on `idx_workout_entries_user_cursor`, so it no longer filters earlier rows. The earlier expanded `OR` predicate was applied as a `Filter` (`Rows Removed by Filter: 25001`). The row-value form is valid because all three sort keys are `DESC`; before switching, both predicates were compared on 540 cursors (including 40 rows sharing one `workout_date` and `created_at`) with zero page differences.
+- PR queries select the user's entries efficiently but still scan a significant number of `workout_sets` (`Parallel Seq Scan`), so PR cost grows with accumulated set count.
 - The evidence SQL is a hand-written equivalent of the application query shape, not captured ORM SQL.
-
-The recorded evidence used an earlier script shape with `LIMIT 51` history lookahead and PR ties ending at `set_order`. The current harness uses the service's `LIMIT 21` lookahead and final `ws.id` tie key; rerun the harness before quoting fresh performance numbers.
 
 ## Reproduce the 50k harness
 

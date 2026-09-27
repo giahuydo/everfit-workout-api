@@ -1,0 +1,196 @@
+=== index state ===
+               indexname                |                                                                           indexdef                                                                            
+----------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+ pk_exercises                           | CREATE UNIQUE INDEX pk_exercises ON public.exercises USING btree (id)
+ uq_exercises_normalized_name           | CREATE UNIQUE INDEX uq_exercises_normalized_name ON public.exercises USING btree (normalized_name)
+ idx_workout_entries_user_cursor        | CREATE INDEX idx_workout_entries_user_cursor ON public.workout_entries USING btree (user_id, workout_date DESC, created_at DESC, id DESC)
+ idx_workout_entries_user_exercise_date | CREATE INDEX idx_workout_entries_user_exercise_date ON public.workout_entries USING btree (user_id, exercise_id, workout_date DESC, created_at DESC, id DESC)
+ pk_workout_entries                     | CREATE UNIQUE INDEX pk_workout_entries ON public.workout_entries USING btree (id)
+ pk_workout_sets                        | CREATE UNIQUE INDEX pk_workout_sets ON public.workout_sets USING btree (id)
+ uq_workout_sets_entry_order            | CREATE UNIQUE INDEX uq_workout_sets_entry_order ON public.workout_sets USING btree (workout_entry_id, set_order)
+(7 rows)
+
+=== history: unfiltered first page ===
+                                                                               QUERY PLAN                                                                                
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.56..3.01 rows=21 width=75) (actual time=0.043..0.112 rows=21 loops=1)
+   Buffers: shared hit=26
+   ->  Nested Loop  (cost=0.56..5851.18 rows=50000 width=75) (actual time=0.042..0.110 rows=21 loops=1)
+         Buffers: shared hit=26
+         ->  Index Scan using idx_workout_entries_user_cursor on workout_entries we  (cost=0.41..4672.91 rows=50000 width=58) (actual time=0.034..0.094 rows=21 loops=1)
+               Index Cond: ((user_id)::text = 'perf-50k-user'::text)
+               Buffers: shared hit=24
+         ->  Memoize  (cost=0.14..0.16 rows=1 width=33) (actual time=0.000..0.000 rows=1 loops=21)
+               Cache Key: we.exercise_id
+               Cache Mode: logical
+               Hits: 20  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+               Buffers: shared hit=2
+               ->  Index Scan using pk_exercises on exercises e  (cost=0.13..0.15 rows=1 width=33) (actual time=0.005..0.005 rows=1 loops=1)
+                     Index Cond: (id = we.exercise_id)
+                     Buffers: shared hit=2
+ Planning:
+   Buffers: shared hit=158
+ Planning Time: 0.732 ms
+ Execution Time: 0.140 ms
+(19 rows)
+
+=== history: partial-name + date + muscle filter ===
+                                                                               QUERY PLAN                                                                                
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.41..21.49 rows=21 width=75) (actual time=0.028..0.047 rows=21 loops=1)
+   Buffers: shared hit=25
+   ->  Nested Loop  (cost=0.41..3930.23 rows=3915 width=75) (actual time=0.028..0.045 rows=21 loops=1)
+         Join Filter: (we.exercise_id = e.id)
+         Buffers: shared hit=25
+         ->  Index Scan using idx_workout_entries_user_cursor on workout_entries we  (cost=0.41..3459.32 rows=31318 width=58) (actual time=0.013..0.026 rows=21 loops=1)
+               Index Cond: (((user_id)::text = 'perf-50k-user'::text) AND (workout_date >= '2026-07-01'::date) AND (workout_date <= '2026-09-25'::date))
+               Buffers: shared hit=24
+         ->  Materialize  (cost=0.00..1.15 rows=1 width=33) (actual time=0.001..0.001 rows=1 loops=21)
+               Buffers: shared hit=1
+               ->  Seq Scan on exercises e  (cost=0.00..1.14 rows=1 width=33) (actual time=0.011..0.011 rows=1 loops=1)
+                     Filter: (((normalized_name)::text ~~ '%press%'::text) AND (lower((muscle_group)::text) = 'chest'::text))
+                     Buffers: shared hit=1
+ Planning:
+   Buffers: shared hit=27
+ Planning Time: 0.175 ms
+ Execution Time: 0.063 ms
+(17 rows)
+
+=== history: deep keyset page (after row 25,001) ===
+                                                                                                                    QUERY PLAN                                                                                                                    
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.56..3.49 rows=21 width=75) (actual time=0.019..0.070 rows=21 loops=1)
+   Buffers: shared hit=27
+   ->  Nested Loop  (cost=0.56..3479.50 rows=24912 width=75) (actual time=0.019..0.068 rows=21 loops=1)
+         Buffers: shared hit=27
+         ->  Index Scan using idx_workout_entries_user_cursor on workout_entries we  (cost=0.41..2891.84 rows=24912 width=58) (actual time=0.011..0.054 rows=21 loops=1)
+               Index Cond: (((user_id)::text = 'perf-50k-user'::text) AND (ROW(workout_date, created_at, id) < ROW('2026-07-18'::date, '2026-07-18 12:04:09.043449+00'::timestamp with time zone, '35d64c1e-04ac-f853-d50d-0037d60c8cd9'::uuid)))
+               Buffers: shared hit=25
+         ->  Memoize  (cost=0.14..0.16 rows=1 width=33) (actual time=0.000..0.000 rows=1 loops=21)
+               Cache Key: we.exercise_id
+               Cache Mode: logical
+               Hits: 20  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+               Buffers: shared hit=2
+               ->  Index Scan using pk_exercises on exercises e  (cost=0.13..0.15 rows=1 width=33) (actual time=0.004..0.004 rows=1 loops=1)
+                     Index Cond: (id = we.exercise_id)
+                     Buffers: shared hit=2
+ Planning:
+   Buffers: shared hit=4
+ Planning Time: 0.120 ms
+ Execution Time: 0.113 ms
+(19 rows)
+
+=== PR: heaviest ===
+                                                                                                  QUERY PLAN                                                                                                  
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=5167.16..5167.28 rows=1 width=55) (actual time=27.985..30.154 rows=1 loops=1)
+   Buffers: shared hit=2390
+   ->  Gather Merge  (cost=5167.16..6553.72 rows=12057 width=55) (actual time=27.984..30.153 rows=1 loops=1)
+         Workers Planned: 1
+         Workers Launched: 1
+         Buffers: shared hit=2390
+         ->  Sort  (cost=4167.15..4197.30 rows=12057 width=55) (actual time=25.928..25.930 rows=1 loops=2)
+               Sort Key: ws.weight_kg DESC, we.workout_date, we.created_at, we.id, ws.set_order, ws.id
+               Sort Method: top-N heapsort  Memory: 25kB
+               Buffers: shared hit=2390
+               Worker 0:  Sort Method: top-N heapsort  Memory: 25kB
+               ->  Hash Join  (cost=741.29..4106.87 rows=12057 width=55) (actual time=6.172..21.939 rows=24622 loops=2)
+                     Hash Cond: (ws.workout_entry_id = we.id)
+                     Buffers: shared hit=2353
+                     ->  Parallel Seq Scan on workout_sets ws  (cost=0.00..2859.37 rows=102837 width=43) (actual time=0.007..5.033 rows=87412 loops=2)
+                           Buffers: shared hit=1831
+                     ->  Hash  (cost=668.01..668.01 rows=5862 width=28) (actual time=5.967..5.968 rows=14058 loops=2)
+                           Buckets: 16384 (originally 8192)  Batches: 1 (originally 1)  Memory Usage: 1007kB
+                           Buffers: shared hit=475
+                           ->  Nested Loop  (cost=0.41..668.01 rows=5862 width=28) (actual time=0.040..3.897 rows=14058 loops=2)
+                                 Buffers: shared hit=475
+                                 ->  Seq Scan on exercises e  (cost=0.00..1.10 rows=1 width=16) (actual time=0.007..0.009 rows=1 loops=2)
+                                       Filter: ((normalized_name)::text = 'bench press'::text)
+                                       Rows Removed by Filter: 7
+                                       Buffers: shared hit=2
+                                 ->  Index Only Scan using idx_workout_entries_user_exercise_date on workout_entries we  (cost=0.41..599.91 rows=6700 width=44) (actual time=0.031..2.432 rows=14058 loops=2)
+                                       Index Cond: ((user_id = 'perf-50k-user'::text) AND (exercise_id = e.id) AND (workout_date >= '2024-01-01'::date) AND (workout_date <= '2026-09-25'::date))
+                                       Heap Fetches: 2
+                                       Buffers: shared hit=473
+ Planning:
+   Buffers: shared hit=75
+ Planning Time: 0.463 ms
+ Execution Time: 30.320 ms
+(33 rows)
+
+=== PR: highest volume ===
+                                                                                                  QUERY PLAN                                                                                                  
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=5227.45..5227.56 rows=1 width=87) (actual time=30.245..32.451 rows=1 loops=1)
+   Buffers: shared hit=2390
+   ->  Gather Merge  (cost=5227.45..6614.00 rows=12057 width=87) (actual time=30.244..32.449 rows=1 loops=1)
+         Workers Planned: 1
+         Workers Launched: 1
+         Buffers: shared hit=2390
+         ->  Sort  (cost=4227.44..4257.58 rows=12057 width=87) (actual time=28.878..28.880 rows=1 loops=2)
+               Sort Key: (((ws.reps)::numeric * ws.weight_kg)) DESC, we.workout_date, we.created_at, we.id, ws.set_order, ws.id
+               Sort Method: top-N heapsort  Memory: 25kB
+               Buffers: shared hit=2390
+               Worker 0:  Sort Method: top-N heapsort  Memory: 25kB
+               ->  Hash Join  (cost=741.29..4167.15 rows=12057 width=87) (actual time=6.640..24.849 rows=24622 loops=2)
+                     Hash Cond: (ws.workout_entry_id = we.id)
+                     Buffers: shared hit=2353
+                     ->  Parallel Seq Scan on workout_sets ws  (cost=0.00..2859.37 rows=102837 width=43) (actual time=0.007..5.085 rows=87412 loops=2)
+                           Buffers: shared hit=1831
+                     ->  Hash  (cost=668.01..668.01 rows=5862 width=28) (actual time=6.577..6.578 rows=14058 loops=2)
+                           Buckets: 16384 (originally 8192)  Batches: 1 (originally 1)  Memory Usage: 1007kB
+                           Buffers: shared hit=475
+                           ->  Nested Loop  (cost=0.41..668.01 rows=5862 width=28) (actual time=0.032..3.313 rows=14058 loops=2)
+                                 Buffers: shared hit=475
+                                 ->  Seq Scan on exercises e  (cost=0.00..1.10 rows=1 width=16) (actual time=0.004..0.006 rows=1 loops=2)
+                                       Filter: ((normalized_name)::text = 'bench press'::text)
+                                       Rows Removed by Filter: 7
+                                       Buffers: shared hit=2
+                                 ->  Index Only Scan using idx_workout_entries_user_exercise_date on workout_entries we  (cost=0.41..599.91 rows=6700 width=44) (actual time=0.026..2.321 rows=14058 loops=2)
+                                       Index Cond: ((user_id = 'perf-50k-user'::text) AND (exercise_id = e.id) AND (workout_date >= '2024-01-01'::date) AND (workout_date <= '2026-09-25'::date))
+                                       Heap Fetches: 2
+                                       Buffers: shared hit=473
+ Planning:
+   Buffers: shared hit=18
+ Planning Time: 0.285 ms
+ Execution Time: 32.592 ms
+(33 rows)
+
+=== PR: estimated 1RM ===
+                                                                                                  QUERY PLAN                                                                                                  
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=5287.73..5287.85 rows=1 width=87) (actual time=30.022..32.067 rows=1 loops=1)
+   Buffers: shared hit=2390
+   ->  Gather Merge  (cost=5287.73..6674.29 rows=12057 width=87) (actual time=30.021..32.065 rows=1 loops=1)
+         Workers Planned: 1
+         Workers Launched: 1
+         Buffers: shared hit=2390
+         ->  Sort  (cost=4287.72..4317.87 rows=12057 width=87) (actual time=28.729..28.731 rows=1 loops=2)
+               Sort Key: ((ws.weight_kg * ('1'::numeric + ((ws.reps)::numeric / '30'::numeric)))) DESC, we.workout_date, we.created_at, we.id, ws.set_order, ws.id
+               Sort Method: top-N heapsort  Memory: 25kB
+               Buffers: shared hit=2390
+               Worker 0:  Sort Method: top-N heapsort  Memory: 25kB
+               ->  Hash Join  (cost=741.29..4227.44 rows=12057 width=87) (actual time=4.918..24.736 rows=24622 loops=2)
+                     Hash Cond: (ws.workout_entry_id = we.id)
+                     Buffers: shared hit=2353
+                     ->  Parallel Seq Scan on workout_sets ws  (cost=0.00..2859.37 rows=102837 width=43) (actual time=0.004..4.562 rows=87412 loops=2)
+                           Buffers: shared hit=1831
+                     ->  Hash  (cost=668.01..668.01 rows=5862 width=28) (actual time=4.859..4.860 rows=14058 loops=2)
+                           Buckets: 16384 (originally 8192)  Batches: 1 (originally 1)  Memory Usage: 1007kB
+                           Buffers: shared hit=475
+                           ->  Nested Loop  (cost=0.41..668.01 rows=5862 width=28) (actual time=0.030..3.142 rows=14058 loops=2)
+                                 Buffers: shared hit=475
+                                 ->  Seq Scan on exercises e  (cost=0.00..1.10 rows=1 width=16) (actual time=0.005..0.007 rows=1 loops=2)
+                                       Filter: ((normalized_name)::text = 'bench press'::text)
+                                       Rows Removed by Filter: 7
+                                       Buffers: shared hit=2
+                                 ->  Index Only Scan using idx_workout_entries_user_exercise_date on workout_entries we  (cost=0.41..599.91 rows=6700 width=44) (actual time=0.023..2.230 rows=14058 loops=2)
+                                       Index Cond: ((user_id = 'perf-50k-user'::text) AND (exercise_id = e.id) AND (workout_date >= '2024-01-01'::date) AND (workout_date <= '2026-09-25'::date))
+                                       Heap Fetches: 2
+                                       Buffers: shared hit=473
+ Planning:
+   Buffers: shared hit=18
+ Planning Time: 0.292 ms
+ Execution Time: 32.198 ms
+(33 rows)
+

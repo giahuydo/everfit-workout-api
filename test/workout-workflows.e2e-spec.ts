@@ -231,6 +231,42 @@ describe('workout assignment workflows', () => {
     });
   });
 
+  it('pages through entries tied on workout_date and created_at by id without gaps or duplicates', async () => {
+    const userId = 'cursor-tie-user';
+    const logged = await postWorkout(userId, {
+      date: '2026-09-20',
+      exercises: ['Tie A', 'Tie B', 'Tie C', 'Tie D'].map((exerciseName) => ({
+        exerciseName,
+        sets: [{ reps: 5, weight: 50, unit: 'kg' }],
+      })),
+    });
+    expect(logged.status).toBe(201);
+    await seedWorkout(userId, 'Tie A', [{ reps: 5, weight: 55, unit: 'kg' }], '2026-09-21');
+    await seedWorkout(userId, 'Tie A', [{ reps: 5, weight: 45, unit: 'kg' }], '2026-09-19');
+    // Force a full (workout_date, created_at) tie so only the id breaks it.
+    await dataSource.query(
+      `UPDATE workout_entries SET created_at = '2026-09-20T08:00:00Z' WHERE user_id = $1 AND workout_date = '2026-09-20'`,
+      [userId],
+    );
+    const expected = (await dataSource.query(
+      'SELECT id FROM workout_entries WHERE user_id = $1 ORDER BY workout_date DESC, created_at DESC, id DESC',
+      [userId],
+    )) as Array<{ id: string }>;
+
+    const seen: string[] = [];
+    let cursor: string | null = null;
+    do {
+      const query: string = cursor ? `&cursor=${encodeURIComponent(cursor)}` : '';
+      const page = await request(app.getHttpServer()).get(`/v1/users/${userId}/workouts?limit=1${query}`);
+      expect(page.status).toBe(200);
+      seen.push(...(page.body.items as Array<{ id: string }>).map((item) => item.id));
+      cursor = page.body.page.nextCursor as string | null;
+    } while (cursor);
+
+    expect(seen).toEqual(expected.map((row) => row.id));
+    expect(seen).toHaveLength(6);
+  });
+
   it('rejects malformed and scope-mismatched history cursors', async () => {
     await seedWorkout('cursor-scope-user', 'Cursor Lift', [{ reps: 5, weight: 50, unit: 'kg' }], '2026-09-25');
     await seedWorkout('cursor-scope-user', 'Cursor Lift', [{ reps: 5, weight: 60, unit: 'kg' }], '2026-09-24');

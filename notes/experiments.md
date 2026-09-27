@@ -68,5 +68,15 @@ Limitations:
 
 - Keep the existing indexes unchanged: `idx_workout_entries_user_cursor`, `idx_workout_entries_user_exercise_date`, the exercises normalized-name unique index, and the workout-set entry/order unique index.
 - Why: the measured plans were acceptable for the assignment's 50k-entries-per-user target, so no trigram or PR-ranking index was added on speculation.
-- Follow-up (proposed, not implemented): rewrite the keyset predicate as a row-value comparison and re-measure deep pages; if PR latency matters at larger set counts, test a covering `workout_sets(workout_entry_id)`-driven plan or a per-exercise projection before adding infrastructure.
+- Follow-up: the keyset row-value rewrite was implemented and re-measured on 2026-09-27 (next section). If PR latency matters at larger set counts, test a covering `workout_sets(workout_entry_id)`-driven plan or a per-exercise projection before adding infrastructure.
 - Earlier agent reports that migration and performance verification were blocked accurately described their sandbox's local TCP/Docker restriction; that environmental claim is stale for the human/orchestrator environment that produced this run.
+
+## 2026-09-27 — 50k rerun and row-value keyset predicate
+
+- Setup: fresh `postgres:16-alpine` (16.15), `pnpm migration:run`, seeded once with `scripts/perf/run-50k-evidence.sh` (50,000 entries, 174,823 sets; seed output byte-identical to 2026-09-25). The current `explain-50k.sql` (`LIMIT 21`, `ws.id` tie key) was run five times before and five times after the change.
+- Before (expanded `OR`): the deep page after row 25,001 took 5.8–9.2 ms, `Rows Removed by Filter: 25001`, ~25,356 buffers — the 2026-09-25 finding reproduced.
+- Change: `WorkoutsService` now uses `(workout_date, created_at, id) < (d, c, id)`. Valid because all three sort keys are `DESC`, matching `idx_workout_entries_user_cursor`.
+- Equivalence check: on the seeded data plus 40 injected rows sharing one `workout_date` and `created_at`, both predicates were compared on 540 cursors; every next page of 21 IDs matched (0 mismatches). Unit (73/73) and E2E (32/32) suites pass; the tie case is now a permanent E2E regression test (33/33).
+- After: the deep page uses the predicate as an `Index Cond`, 27 buffers, 0.10–0.60 ms. First-page and filtered history unchanged (≤0.6 ms). PR queries unchanged in shape (`Parallel Seq Scan on workout_sets`), 25–50 ms, one 125 ms outlier in run 3.
+- Evidence: [`notes/evidence/2026-09-27-local-50k-explain.out`](evidence/2026-09-27-local-50k-explain.out) (fifth post-change run); ranges in [`docs/verification.md`](../docs/verification.md#50k-query-plan-evidence).
+- Decision: keep indexes unchanged; the fix was a predicate rewrite, not a new index. PR aggregation remains the known scale limit.

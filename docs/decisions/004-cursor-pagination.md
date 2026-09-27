@@ -36,8 +36,8 @@ The scope hash detects accidental query mismatch. It is not authentication, auth
 - concurrent inserts and catalog metadata edits may change what later pages contain;
 - HMAC signing is deferred unless cursor integrity becomes a product/security requirement.
 
-## Measured limitation
+## Measured change
 
-The recorded 50k run showed the current expanded keyset predicate acting as an index `Filter` at deep pages, removing 25,001 rows rather than becoming an index bound. The next evidence-driven optimization would be a row-value comparison, followed by re-measurement—not extra infrastructure by default.
+The first 50k run showed the expanded keyset predicate (`date < d OR (date = d AND created_at < c) OR ...`) acting as an index `Filter` at deep pages, removing 25,001 rows rather than becoming an index bound. The predicate is now the row-value comparison `(workout_date, created_at, id) < (d, c, id)`, which PostgreSQL uses as an `Index Cond`: the page after row 25,001 dropped from ~6–9 ms and ~25k buffers to ~0.1 ms and 27 buffers. This relies on every sort key sharing the same `DESC` direction; a mixed-direction sort would need the expanded form again. No index or infrastructure was added.
 
 See [`notes/experiments.md`](../../notes/experiments.md).

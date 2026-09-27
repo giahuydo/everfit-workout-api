@@ -162,9 +162,10 @@ export class WorkoutsService {
     if (query.cursor) {
       const cursor = this.decodeCursor(query.cursor, scope);
       qb.andWhere(
-        `(entry.workout_date < :cDate OR
-          (entry.workout_date = :cDate AND entry.created_at < CAST(:cCreatedAt AS timestamptz)) OR
-          (entry.workout_date = :cDate AND entry.created_at = CAST(:cCreatedAt AS timestamptz) AND entry.id < :cId))`,
+        // Row-value comparison lets PostgreSQL seek idx_workout_entries_user_cursor
+        // directly; valid because every sort key is DESC.
+        `(entry.workout_date, entry.created_at, entry.id) <
+          (CAST(:cDate AS date), CAST(:cCreatedAt AS timestamptz), CAST(:cId AS uuid))`,
         { cDate: cursor.date, cCreatedAt: cursor.createdAt, cId: cursor.id },
       );
     }

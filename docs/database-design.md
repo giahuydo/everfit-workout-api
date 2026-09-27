@@ -119,7 +119,7 @@ Tie order after metric DESC is `workout_date ASC, created_at ASC, entry id ASC, 
 
 ## Measured behavior and limits
 
-One local 50k-entry run showed fast first-page history and ~31–34 ms PR query plans, but also exposed two limits: the expanded deep-page keyset predicate was used as an index filter rather than an index bound, and PR plans scanned all `workout_sets` in parallel. These are documented evidence, not hidden by the design.
+The 50k-entry runs showed fast history pages and ~25–40 ms PR query plans. The first run exposed that the expanded deep-page keyset predicate was used as an index filter rather than an index bound; the service now uses a row-value comparison, which PostgreSQL applies as an index bound (deep page ~7 ms → ~0.1 ms). The remaining limit is that PR plans scan all `workout_sets` in parallel, so PR cost grows with accumulated set count.
 
 See [the experiments log](../notes/experiments.md) and [raw evidence](../notes/evidence/README.md) for exact plans, timings, and caveats.
 

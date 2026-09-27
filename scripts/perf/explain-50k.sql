@@ -2,8 +2,7 @@
 -- evidence: psql prints actual planning/execution time and buffer usage.
 -- History pages use the service default page size (limit 20, fetched as 21
 -- for the hasMore lookahead); PR ORDER BY matches the service tie key,
--- ending in ws.id. The recorded 2026-09-26 timings used the earlier shape
--- (LIMIT 51, PR ties ending at set_order) and have not been remeasured.
+-- ending in ws.id. Evidence dated 2026-09-27 was measured with this file.
 \set ON_ERROR_STOP on
 \if :{?perf_user_id}
 \else
@@ -31,7 +30,7 @@ WHERE we.user_id = :'perf_user_id'
 ORDER BY we.workout_date DESC, we.created_at DESC, we.id DESC LIMIT 21;
 
 -- Obtain an actual key from the representative user's 25,001st row.  The
--- following predicate is the service's expanded tuple keyset predicate.
+-- following predicate is the service's row-value keyset predicate.
 SELECT workout_date AS cursor_date, created_at AS cursor_created_at, id AS cursor_id
 FROM workout_entries WHERE user_id = :'perf_user_id'
 ORDER BY workout_date DESC, created_at DESC, id DESC OFFSET 25000 LIMIT 1 \gset
@@ -41,9 +40,8 @@ EXPLAIN (ANALYZE, BUFFERS)
 SELECT we.id, we.user_id, we.exercise_id, we.workout_date, we.created_at, e.name, e.muscle_group
 FROM workout_entries we JOIN exercises e ON e.id = we.exercise_id
 WHERE we.user_id = :'perf_user_id'
-  AND (we.workout_date < :'cursor_date'::date
-    OR (we.workout_date = :'cursor_date'::date AND we.created_at < :'cursor_created_at'::timestamptz)
-    OR (we.workout_date = :'cursor_date'::date AND we.created_at = :'cursor_created_at'::timestamptz AND we.id < :'cursor_id'::uuid))
+  AND (we.workout_date, we.created_at, we.id)
+    < (:'cursor_date'::date, :'cursor_created_at'::timestamptz, :'cursor_id'::uuid)
 ORDER BY we.workout_date DESC, we.created_at DESC, we.id DESC LIMIT 21;
 
 -- These are the three independent SQL shapes in PersonalRecordsService.
