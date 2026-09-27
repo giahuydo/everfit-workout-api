@@ -70,6 +70,10 @@ correct tests/contracts/runtime details
 rerun and verify
 ```
 
+### 4. A mocked unit test hid a runtime bug
+
+The error-envelope unit test for `413` built its request with a ready-made `id`, so it passed. A real oversized request showed `requestId: "unknown"`: the JSON body parser rejects the body before pino-http assigns the id. The fix moved id resolution into a shared `resolveRequestId()` used by both pino-http and the exception filter (`d0435bc`); new specs cover a request without an id and a client-supplied `x-request-id`. Found by a runtime `curl` check, not by the test suite. See AI-09 in [`notes/ai-findings.md`](notes/ai-findings.md).
+
 ## Example of a rejected AI suggestion
 
 **Suggestion:** use exercise-ID PR lookup and return `404` for an unknown exercise.
@@ -88,6 +92,8 @@ The effective pattern was to provide constraints before asking for implementatio
 - require evidence (source path, test, migration, or query plan) before accepting severity or completion claims;
 - avoid speculative infrastructure until the measured query shape justifies it.
 
+**Rules files and shared context.** The repository has no tool-specific rules file (`CLAUDE.md`, `.cursorrules`). Instead, a local orchestration board (`notes/agent-board/`, not committed) acted as the shared system context: it named the source of truth (assignment + `docs/`), gave each agent one role, kept reviewers read-only with a single integration writer, and stated what counted as an accepted finding.
+
 ## Verification boundary
 
 A green test suite is evidence only for the environment and layer it actually exercised. This mattered three times:
@@ -103,9 +109,9 @@ These are process findings, not fabricated AI-error stories; no retained record 
 On 2026-09-27, at the current HEAD:
 
 - `pnpm build` and `pnpm lint` — pass;
-- `pnpm test` — 73/73 in 11 files (unit and contract specs);
+- `pnpm test` — 75/75 in 11 files (unit and contract specs);
 - `pnpm test:e2e` — 33/33 in 2 DB-backed files, including the migration-backed suite;
-- fresh-clone `docker compose up --build` — migration completed before app startup, `/health/ready` healthy, all four endpoints plus 400/413 checked by hand;
+- fresh-clone `docker compose up --build` — migration completed before app startup, `/health/ready` healthy, all four endpoints plus 400/413 checked by hand (413 now returns a real `requestId`);
 - 50k query-plan harness rerun after the row-value keyset change (see [`docs/verification.md`](docs/verification.md)).
 
 ## Commit history
