@@ -53,6 +53,8 @@ flowchart TB
 
 Controllers stay thin; services implement the use cases; unit conversion is centralized; and migrations own the schema. Redis, queues, search engines, and microservices are intentionally not introduced without a requirement or measured need.
 
+See [`docs/architecture.md`](docs/architecture.md) for module responsibilities, request flows, operational boundaries, and scaling decisions.
+
 ## Data model at a glance
 
 ```mermaid
@@ -105,72 +107,182 @@ See [`docs/database-design.md`](docs/database-design.md) for schema constraints,
 - **Configurable exercise metadata.** Exercise-to-muscle-group mapping is loaded from configuration rather than hard-coded into business logic.
 - **Versioned schema and production boundaries.** Migrations own schema changes, request sizes are bounded, configuration is validated, and readiness checks include database connectivity.
 
-## Quick start
+## Setup
 
-Prerequisites: Node.js 22, pnpm 10.28.2 (pinned in `package.json` and the Docker build), and Docker.
-
-### Option A: everything in Compose (reproducible path)
+Prerequisite: Docker. One command takes a fresh clone to a running, migrated API:
 
 ```sh
 DB_PASSWORD=choose-a-local-password docker compose up --build
 ```
 
-Compose starts `postgres`, runs the one-shot `migrate` service (versioned migrations), and only then starts `app`. The API listens on `http://localhost:3000` (or `PORT` from the environment/`.env`, e.g. 3100 after `cp .env.example .env`); PostgreSQL is bound to `127.0.0.1:${DB_PORT:-55432}`; set `DB_PORT` if that host port is already in use.
+`DB_PASSWORD` is required on purpose: the container runs with `NODE_ENV=production`, which refuses a missing or default password.
 
-### Option B: API on the host, PostgreSQL in Docker
+```mermaid
+flowchart LR
+    pg[("postgres<br/>pg_isready")] -->|healthy| migrate["migrate<br/>one-shot, versioned migrations"]
+    migrate -->|completed| app["app<br/>/health/ready"]
+    pg -->|healthy| app
+```
+
+| URL | What |
+| --- | --- |
+| `http://localhost:3000/reference` | Scalar — try every endpoint in the browser |
+| `http://localhost:3000/docs` | Swagger UI / OpenAPI |
+| `http://localhost:3000/health/ready` | readiness, includes a database check |
+
+- Port busy? Prefix `PORT=3100` and/or `DB_PORT=55433`. PostgreSQL binds to `127.0.0.1` only.
+- Reset data: `docker compose down -v`.
+- Schema changes come only from migrations (`DB_SYNCHRONIZE=false`); the exercise catalog in `config/exercises.json` is seeded on startup.
+
+<details>
+<summary>Run the API on the host (development, tests)</summary>
+
+Requires Node.js 22 and pnpm 10.28.2 (pinned in `package.json` and the Docker build).
 
 ```sh
-cp .env.example .env              # DB on 127.0.0.1:55432, API on port 3100, DB_PASSWORD=everfit
-docker compose up -d postgres     # start only PostgreSQL; Compose reads DB_PASSWORD/DB_PORT from .env
+cp .env.example .env              # development defaults: API on 3100, DB on 127.0.0.1:55432
+docker compose up -d postgres     # database only
 pnpm install
-pnpm migration:run                # apply versioned migrations
+pnpm migration:run
 pnpm start:dev                    # http://localhost:3100
+
+pnpm build && pnpm lint
+pnpm test                         # unit/contract suite, no database
+pnpm test:e2e                     # creates and drops disposable PostgreSQL databases
 ```
 
-`pnpm start:dev` does not start a database; PostgreSQL must be running and migrated first. Stop it with `docker compose down` (add `-v` to delete the local volume).
+Do not point the E2E database variables at data you want to keep. `test/migrations.e2e-spec.ts` boots the app from versioned migrations with `DB_SYNCHRONIZE=false`.
 
-On startup the app validates and inserts any missing rows from the configurable exercise catalog. Versioned migrations own database schema changes.
-
-Health endpoints are `/health`, `/health/live`, and `/health/ready`. OpenAPI is available at `/docs`, and the interactive Scalar API reference is available at `/reference` for trying the endpoints directly.
-
-Schema synchronization is disabled by default (`DB_SYNCHRONIZE=false`). Migrations own schema changes; `synchronize=true` is only an explicit disposable-local escape hatch, not a production setup.
-
-```sh
-pnpm build
-pnpm lint
-pnpm test          # contract/unit suite, no database
-pnpm test:e2e      # DB-backed suite; needs the local PostgreSQL configuration
-pnpm migration:show
-```
-
-`pnpm test:e2e` uses disposable PostgreSQL databases; do not point the E2E database variables at data you want to keep. The workflow suite exercises HTTP behavior, while `test/migrations.e2e-spec.ts` separately boots the app from versioned migrations with `DB_SYNCHRONIZE=false`.
+</details>
 
 ## API at a glance
 
-The running service exposes four business operations. Use the interactive **Scalar API reference at `/reference`** to execute requests against the running service; the complete request/response contract lives in [`docs/api-design.md`](docs/api-design.md).
+Base path `/v1`. Full contract: [`docs/api-design.md`](docs/api-design.md). Interactive: `/reference`.
 
-| Method | Endpoint | Purpose |
+| Method | Endpoint | Purpose | Success |
+| --- | --- | --- | --- |
+| `POST` | `/v1/users/:userId/workouts` | log exercises + sets for one date (atomic) | `201` |
+| `GET` | `/v1/users/:userId/workouts` | history: `exerciseName`, `from`, `to`, `muscleGroup`, `unit`, `limit`, `cursor` | `200` |
+| `GET` | `/v1/users/:userId/personal-records` | heaviest set, highest volume, Epley 1RM: `exerciseName`, `from`, `to`, `unit` | `200` |
+| `GET` | `/v1/users/:userId/personal-records/compare` | same PRs for two ranges: `rangeAFrom/To`, `rangeBFrom/To` | `200` |
+
+**Log a workout**
+
+`POST /v1/users/client-42/workouts`
+
+```json
+{
+  "date": "2026-09-25",
+  "exercises": [
+    {
+      "exerciseName": "Bench Press",
+      "sets": [
+        { "reps": 5, "weight": 100, "unit": "kg" },
+        { "reps": 8, "weight": 180, "unit": "lb" }
+      ]
+    }
+  ]
+}
+```
+
+`201 Created`
+
+```json
+{
+  "entries": [
+    {
+      "id": "f208022b-…",
+      "exerciseName": "Bench Press",
+      "date": "2026-09-25",
+      "sets": [
+        { "id": "601c48e5-…", "reps": 5, "weight": 100, "unit": "kg" },
+        { "id": "de8ca036-…", "reps": 8, "weight": 180, "unit": "lb" }
+      ]
+    }
+  ]
+}
+```
+
+Reads return `200` even with no data: history returns `items: []`, PRs return `null` records, both with a short `message`. History pages with `page: { limit, hasMore, nextCursor }`.
+
+### Errors
+
+```mermaid
+flowchart LR
+    req["Request"] --> size{"body ≤ 256 KiB"}
+    size -->|no| e413["413 PAYLOAD_TOO_LARGE"]
+    size -->|yes| valid{"DTO, date, range,<br/>unit, cursor valid"}
+    valid -->|no| e400["400 VALIDATION_ERROR"]
+    valid -->|yes| db["Service + PostgreSQL<br/>(one transaction per POST)"]
+    db -->|ok| ok["200 / 201"]
+    db -->|failure| e500["500 INTERNAL_SERVER_ERROR<br/>nothing committed"]
+```
+
+Every error uses one envelope:
+
+```json
+{
+  "statusCode": 400,
+  "code": "VALIDATION_ERROR",
+  "message": "Request validation failed",
+  "details": ["exercises.0.sets.0.reps must not be less than 1"],
+  "requestId": "b3f1c2d4-…"
+}
+```
+
+| Status | `code` | Cause |
 | --- | --- | --- |
-| `POST` | `/v1/users/:userId/workouts` | record completed exercises and sets |
-| `GET` | `/v1/users/:userId/workouts` | filter and page workout history |
-| `GET` | `/v1/users/:userId/personal-records` | calculate three PR metrics for an exercise |
-| `GET` | `/v1/users/:userId/personal-records/compare` | compare PRs across two explicit date ranges |
-
-The API uses structured validation errors, treats valid no-data reads as `200`, keeps bulk workout logging atomic, and binds history cursors to their query scope. See the API design document for examples, filters, pagination, error codes, and response shapes.
+| `400` | `VALIDATION_ERROR` | bad body/query, unknown field, invalid date or range, unsupported unit, cursor from another query |
+| `404` | `HTTP_404` | unknown route |
+| `413` | `PAYLOAD_TOO_LARGE` | body over 256 KiB |
+| `500` | `INTERNAL_SERVER_ERROR` | unexpected failure; `details: null`, no stack trace |
 
 ## Verification at a glance
 
-The current workspace passes `pnpm build`, `pnpm lint`, and **39/39 unit tests in 8 files**. PostgreSQL-backed E2E and migration tests require a disposable test database; their earlier recorded results were not rerun for this DTO/documentation update. A previous 50k-entry run inspected SQL query plans, **not** HTTP throughput or 10k concurrent-coach capacity. Its SQL differs slightly from the current application query.
+| Layer | What it proves | Run | Result |
+| --- | --- | --- | --- |
+| Unit — calculations | kg/lb conversion, half-up rounding, round-trip without drift, volume, calendar dates, name identity | `pnpm test` | 73/73 |
+| Unit — contracts | DTO validation, cursor scope, error envelope, PR mapping, config, catalog | `pnpm test` | (included) |
+| Integration — HTTP + PostgreSQL | all 4 endpoints: atomic rollback, concurrency, cursor paging (incl. full date + created_at ties), PR ranking (independent winners, date ties, inclusive ranges, lb output), 400 cases | `pnpm test:e2e` | 33/33 |
+| Migrations | fresh DB built only from versioned migrations, `DB_SYNCHRONIZE=false` | `pnpm test:e2e` | (included) |
+| Docker | fresh clone → `docker compose up --build` → healthy, all endpoints + 400/413 | manual smoke | pass |
 
-See [`docs/verification.md`](docs/verification.md) for recorded results, reproduction commands, and evidence limits.
+PR ranking itself runs in SQL, so its tests are integration tests against real PostgreSQL rather than mocks. A previous 50k-entry run inspected query plans only, **not** HTTP throughput. Details: [`docs/verification.md`](docs/verification.md).
 
 ## Trade-offs
 
-- Authentication is not implemented because the assignment explicitly passes `userId` as a request parameter.
-- Catalog muscle-group changes affect later history filtering of older entries.
-- The cursor scope hash detects query mismatch but is not a signed security token, and pagination is not snapshot-consistent during concurrent writes.
-- The service intentionally avoids Redis, queues, search infrastructure, and extra services until measurements justify them.
-- Scaling to 10k concurrent coaches would require HTTP load testing plus evidence-driven changes such as horizontal API replicas, disciplined DB pooling/PgBouncer, query/index refinement, and read projections or replicas where measurement supports them.
+| Decision | Gain | Cost |
+| --- | --- | --- |
+| `userId` in the path, no auth | matches the brief | any caller can read or write any user |
+| PRs computed at read time from sets | always consistent, no sync logic | 3 ranking queries per range; cost grows with history |
+| Canonical kg stored next to the original value | exact cross-unit ranking | two weight columns per set |
+| Muscle group read from the live catalog | config edit re-labels history instantly | old entries are re-categorized too |
+| Keyset cursor bound to a query hash | stable deep paging, catches misuse | not signed; not snapshot-consistent under concurrent writes |
+| One NestJS service + PostgreSQL | simple to run and reason about | no cache or queue until measurements ask for one |
+
+## What I would change at scale
+
+Measure first (HTTP load test at the target coach concurrency), then apply what the numbers point to:
+
+```mermaid
+flowchart LR
+    clients["Coach apps"] --> lb["Load balancer<br/>+ auth, rate limit"]
+    lb --> api["API replicas<br/>(stateless)"]
+    api --> pgb["PgBouncer"]
+    pgb -->|writes| primary[("PostgreSQL primary<br/>partitioned workout_entries")]
+    pgb -->|history, PR reads| replica[("Read replicas")]
+    primary -. same transaction .-> proj["PR projection<br/>best set per user + exercise"]
+    primary -. replication .-> replica
+```
+
+| Pressure | Today | Change |
+| --- | --- | --- |
+| DB connections | one `compare` runs 6 queries in parallel on a pool of 10 | PgBouncer; cap per-request parallelism or merge the 3 metrics into one windowed query |
+| PR latency grows with history | ranks every matching set on each read | projection table updated in the log transaction (all-time PRs); keep read-time ranking for custom ranges |
+| Read volume | primary serves everything | route history/PR reads to replicas |
+| Table growth | single `workout_entries` / `workout_sets` | partition by `workout_date` (or hash of `user_id`) |
+| `muscleGroup` filter | `LOWER(muscle_group)` without an index | store normalized value + index, or resolve to `exercise_id`s first |
+| Security | open `userId`, unsigned cursor | JWT with coach → client authorization, HMAC-signed cursors, per-coach rate limits |
 
 ## Documentation
 

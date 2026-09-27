@@ -7,30 +7,27 @@
 
 The take-home is intentionally one stateless NestJS service backed by PostgreSQL. The application layer owns validation and use-case orchestration; PostgreSQL owns durable state, transactional writes, filtering, and PR ranking.
 
-```text
-                         COACH / CLIENT APP
-                                │
-                                │ HTTP / JSON
-                                ▼
-╔═══════════════════════ NESTJS API ═══════════════════════╗
-║                                                         ║
-║  WorkoutsController          PersonalRecordsController  ║
-║          │                              │               ║
-║          ▼                              ▼               ║
-║   WorkoutsService              PersonalRecordsService   ║
-║          │                              │               ║
-║          ├──────── UnitsService ────────┤               ║
-║          │                                              ║
-║          └──── validation · transactions · SQL queries  ║
-╚════════════════════════════╦════════════════════════════╝
-                             │ TypeORM / SQL
-                             ▼
-╔════════════════════════ POSTGRESQL ══════════════════════╗
-║                                                         ║
-║  exercises  ───────►  workout_entries  ───────► sets   ║
-║  identity + metadata   user/date/exercise        reps   ║
-║                                               weights   ║
-╚═════════════════════════════════════════════════════════╝
+```mermaid
+flowchart TB
+    client["Coach / Client App"]
+
+    subgraph api["NestJS API"]
+        direction TB
+        wc["WorkoutsController"] --> ws["WorkoutsService"]
+        prc["PersonalRecordsController"] --> prs["PersonalRecordsService"]
+        ws --> units["UnitsService"]
+        prs --> units
+        ws --> dbops["Validation · Transactions · SQL Queries"]
+        prs --> dbops
+    end
+
+    db[("PostgreSQL")]
+    ex["exercises"] --> we["workout_entries"] --> sets["workout_sets"]
+
+    client -->|"HTTP / JSON"| wc
+    client -->|"HTTP / JSON"| prc
+    dbops -->|"TypeORM / SQL"| db
+    db --> ex
 ```
 
 The design deliberately does **not** add Redis, queues, search infrastructure, or microservices without a requirement or measurement that needs them.
