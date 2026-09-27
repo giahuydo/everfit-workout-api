@@ -241,9 +241,9 @@ Every error uses one envelope:
 
 | Layer | What it proves | Run | Result |
 | --- | --- | --- | --- |
-| Unit — calculations | kg/lb conversion, half-up rounding, round-trip without drift, volume, calendar dates, name identity | `pnpm test` | 73/73 |
+| Unit — calculations | kg/lb conversion, half-up rounding, round-trip without drift, volume, calendar dates, name identity | `pnpm test` | 75/75 |
 | Unit — contracts | DTO validation, cursor scope, error envelope, PR mapping, config, catalog | `pnpm test` | (included) |
-| Integration — HTTP + PostgreSQL | all 4 endpoints: atomic rollback, concurrency, cursor paging (incl. full date + created_at ties), PR ranking (independent winners, date ties, inclusive ranges, lb output), 400 cases | `pnpm test:e2e` | 33/33 |
+| Integration — HTTP + PostgreSQL | all 4 endpoints: invalid bulk request persists nothing, concurrency, cursor paging (incl. full date + created_at ties), PR ranking (independent winners, date ties, inclusive ranges, lb output), 400 cases | `pnpm test:e2e` | 33/33 |
 | Migrations | fresh DB built only from versioned migrations, `DB_SYNCHRONIZE=false` | `pnpm test:e2e` | (included) |
 | Docker | fresh clone → `docker compose up --build` → healthy, all endpoints + 400/413 | manual smoke | pass |
 

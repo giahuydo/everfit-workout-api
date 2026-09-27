@@ -124,7 +124,7 @@ describe('workout assignment workflows', () => {
     expect(await count('workout_sets')).toBe(3);
   });
 
-  it('rolls back the entire bulk request when any exercise is invalid', async () => {
+  it('rejects the entire bulk request without persisting anything when any exercise is invalid', async () => {
     const response = await postWorkout('rollback-user', {
       date: '2026-09-25',
       exercises: [
