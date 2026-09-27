@@ -6,6 +6,7 @@ import {
   Matches,
   MaxLength,
 } from 'class-validator';
+import { fromDateExamples, toDateExamples } from '../../common/openapi-date-examples.js';
 import { WEIGHT_UNITS, type WeightUnit } from '../../units/units.service.js';
 
 export class PrQueryDto {
@@ -15,12 +16,12 @@ export class PrQueryDto {
   @MaxLength(120)
   exerciseName!: string;
 
-  @ApiPropertyOptional({ example: '2026-08-01', format: 'date' })
+  @ApiPropertyOptional({ format: 'date', example: '2026-08-01', examples: fromDateExamples })
   @IsOptional()
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
   from?: string;
 
-  @ApiPropertyOptional({ example: '2026-09-30', format: 'date' })
+  @ApiPropertyOptional({ format: 'date', example: '2026-09-30', examples: toDateExamples })
   @IsOptional()
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
   to?: string;

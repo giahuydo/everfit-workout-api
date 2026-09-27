@@ -59,6 +59,22 @@ export const workoutRequestExamples = {
       { reps: 5, weight: 105, unit: 'stone' },
     ]),
   },
+  invalidBulkOneBadExercise: {
+    summary: 'Invalid — bulk with one bad exercise (400, nothing saved)',
+    value: {
+      date: '2026-09-20',
+      exercises: [
+        {
+          exerciseName: 'Bench Press',
+          sets: [{ reps: 5, weight: 100, unit: 'kg' }],
+        },
+        {
+          exerciseName: 'Back Squat',
+          sets: [{ reps: 5, weight: 120, unit: 'stone' }],
+        },
+      ],
+    },
+  },
   invalidNegativeValues: {
     summary: 'Invalid — negative reps and weight (400)',
     value: withFirstExerciseSets('2026-09-20', [
