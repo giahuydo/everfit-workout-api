@@ -42,7 +42,7 @@ Only the deep-page predicate changed between the two columns; other differences 
 - The first history page and the representative filtered history query are cheap at the measured dataset size.
 - The deep keyset page now uses the row-value predicate as an `Index Cond` on `idx_workout_entries_user_cursor`, so it no longer filters earlier rows. The earlier expanded `OR` predicate was applied as a `Filter` (`Rows Removed by Filter: 25001`). The row-value form is valid because all three sort keys are `DESC`; before switching, both predicates were compared on 540 cursors (including 40 rows sharing one `workout_date` and `created_at`) with zero page differences.
 - PR queries select the user's entries efficiently but still scan a significant number of `workout_sets` (`Parallel Seq Scan`), so PR cost grows with accumulated set count.
-- The evidence SQL is a hand-written equivalent of the application query shape, not captured ORM SQL.
+- The evidence SQL is a hand-written equivalent of the application query shape, not captured ORM SQL. As a spot check, the SQL TypeORM actually emits for a history page was captured (`log_statement=all`) and explained on the same 50k data with a cursor at row 25,001. Because of `.take()` with a join, TypeORM issues a `SELECT DISTINCT` id query, then an entity query, then one sets query. The id query also used the row-value `Index Cond` (26 shared buffers, 0.059 ms, `LIMIT 21`, one run on 2026-09-27).
 
 ## Reproduce the 50k harness
 
