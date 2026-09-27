@@ -318,4 +318,57 @@ describe('workout assignment workflows', () => {
       rangeB: expect.objectContaining({ from: '2026-08-01', to: '2026-08-31', records: expect.objectContaining({ heaviestSet: expect.objectContaining({ value: 100 }) }) }),
     });
   });
+  it('ranks each PR metric independently, so three different sets can win', async () => {
+    const entry = await seedWorkout('independent-pr-user', 'Independent Lift', [
+      { reps: 1, weight: 140, unit: 'kg' },  // heaviest; Epley 144.667; volume 140
+      { reps: 20, weight: 60, unit: 'kg' },  // volume 1200; Epley 100
+      { reps: 8, weight: 120, unit: 'kg' },  // Epley 152; volume 960
+    ], '2026-09-20');
+
+    const response = await request(app.getHttpServer())
+      .get('/v1/users/independent-pr-user/personal-records?exerciseName=Independent%20Lift');
+    expect(response.status).toBe(200);
+    expect(response.body.heaviestSet).toEqual(expect.objectContaining({ setId: entry.sets[0].id, value: 140 }));
+    expect(response.body.highestVolume).toEqual(expect.objectContaining({ setId: entry.sets[1].id, value: 1200 }));
+    expect(response.body.estimatedOneRepMax).toEqual(expect.objectContaining({ setId: entry.sets[2].id, value: 152 }));
+  });
+
+  it('breaks equal PRs by the earliest workout date, not by insertion time', async () => {
+    await seedWorkout('tie-pr-user', 'Tie Lift', [{ reps: 5, weight: 100, unit: 'kg' }], '2026-09-10');
+    const earlierDateLoggedLater = await seedWorkout('tie-pr-user', 'Tie Lift', [{ reps: 5, weight: 100, unit: 'kg' }], '2026-09-01');
+
+    const response = await request(app.getHttpServer()).get('/v1/users/tie-pr-user/personal-records?exerciseName=Tie%20Lift');
+    expect(response.status).toBe(200);
+    for (const metric of ['heaviestSet', 'highestVolume', 'estimatedOneRepMax']) {
+      expect(response.body[metric]).toEqual(expect.objectContaining({
+        entryId: earlierDateLoggedLater.id,
+        achievedDate: '2026-09-01',
+      }));
+    }
+  });
+
+  it('applies inclusive PR range bounds and converts the output unit', async () => {
+    await seedWorkout('range-pr-user', 'Range Lift', [{ reps: 5, weight: 90, unit: 'kg' }], '2026-09-01');
+    const lastDay = await seedWorkout('range-pr-user', 'Range Lift', [{ reps: 5, weight: 100, unit: 'kg' }], '2026-09-30');
+    await seedWorkout('range-pr-user', 'Range Lift', [{ reps: 5, weight: 200, unit: 'kg' }], '2026-10-01');
+
+    const response = await request(app.getHttpServer())
+      .get('/v1/users/range-pr-user/personal-records?exerciseName=Range%20Lift&from=2026-09-01&to=2026-09-30&unit=lb');
+    expect(response.status).toBe(200);
+    expect(response.body.heaviestSet).toEqual(expect.objectContaining({
+      entryId: lastDay.id, weight: 220.462, unit: 'lb', value: 220.462, valueUnit: 'lb',
+    }));
+    expect(response.body.highestVolume).toEqual(expect.objectContaining({ value: 1102.311, valueUnit: 'lb·reps' }));
+  });
+
+  it.each([
+    ['PR without exerciseName', '/v1/users/u/personal-records'],
+    ['PR with reversed range', '/v1/users/u/personal-records?exerciseName=x&from=2026-09-30&to=2026-09-01'],
+    ['compare missing a bound', '/v1/users/u/personal-records/compare?exerciseName=x&rangeAFrom=2026-09-01&rangeATo=2026-09-30&rangeBFrom=2026-08-01'],
+    ['compare with a reversed range', '/v1/users/u/personal-records/compare?exerciseName=x&rangeAFrom=2026-09-30&rangeATo=2026-09-01&rangeBFrom=2026-08-01&rangeBTo=2026-08-31'],
+    ['history limit above 100', '/v1/users/u/workouts?limit=101'],
+    ['history unknown query field', '/v1/users/u/workouts?sort=asc'],
+  ])('rejects %s with the validation envelope', async (_label, url) => {
+    expectValidationFailure(await request(app.getHttpServer()).get(url));
+  });
 });
